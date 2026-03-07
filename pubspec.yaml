@@ -40,6 +40,7 @@ dependencies:
   intl: ^0.20.2
   fl_chart: ^1.1.1
   equatable: ^2.0.8
+  provider: ^6.1.2
 
 dev_dependencies:
   flutter_test:

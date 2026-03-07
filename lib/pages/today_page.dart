@@ -1,6 +1,8 @@
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../utils/step_service.dart';
+import '../providers/step_provider.dart';
 import 'goal_setup_page.dart';
 
 class TodayPage extends StatefulWidget {
@@ -19,29 +21,7 @@ class TodayPage extends StatefulWidget {
 }
 
 class _TodayPageState extends State<TodayPage> {
-  int _steps = 0;
   final _numberFormat = NumberFormat("#,##0", "en_US");
-
-  @override
-  void initState() {
-    super.initState();
-    _initStream();
-  }
-
-  void _initStream() {
-    widget.repository.getTodayStepsStream().listen(
-      (steps) {
-        if (mounted) {
-          setState(() {
-            _steps = steps;
-          });
-        }
-      },
-      onError: (error) {
-        debugPrint('Stream Error: \$error');
-      },
-    );
-  }
 
   String _formatNumber(int number) {
     return _numberFormat.format(number);
@@ -60,12 +40,16 @@ class _TodayPageState extends State<TodayPage> {
 
   @override
   Widget build(BuildContext context) {
+    final stepProvider = context.watch<StepProvider>();
+    final int steps = stepProvider.todaySteps;
+    final int goal = stepProvider.goal;
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? Colors.black : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black;
     final limeColor = const Color(0xFFC7F900);
 
-    final double percentage = (_steps / widget.goal).clamp(0.0, 1.0);
+    final double percentage = (steps / goal).clamp(0.0, 1.0);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -81,20 +65,35 @@ class _TodayPageState extends State<TodayPage> {
               color: limeColor,
             ),
           ),
-          _buildForeground(context, textColor: textColor),
+          _buildForeground(
+            context,
+            textColor: textColor,
+            steps: steps,
+            goal: goal,
+          ),
           ClipRect(
             clipper: _BottomFillClipper(percentage),
-            child: _buildForeground(context, textColor: Colors.black),
+            child: _buildForeground(
+              context,
+              textColor: Colors.black,
+              steps: steps,
+              goal: goal,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildForeground(BuildContext context, {required Color textColor}) {
-    final String formattedGoal = _formatNumber(widget.goal);
-    final String formattedSteps = _formatNumber(_steps);
-    final remainingData = getFormattedRemaining(_steps, widget.goal);
+  Widget _buildForeground(
+    BuildContext context, {
+    required Color textColor,
+    required int steps,
+    required int goal,
+  }) {
+    final String formattedGoal = _formatNumber(goal);
+    final String formattedSteps = _formatNumber(steps);
+    final remainingData = getFormattedRemaining(steps, goal);
 
     return Column(
       children: [

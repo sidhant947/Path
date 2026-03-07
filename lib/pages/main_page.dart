@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../utils/step_service.dart';
 import 'stats_page.dart';
 import 'today_page.dart';
