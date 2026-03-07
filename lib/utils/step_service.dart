@@ -37,29 +37,55 @@ class StepService {
   }
 
   Stream<int> getTodayStepsStream() async* {
-    int baseline = prefs.getInt('step_baseline') ?? 0;
+    // 1. Initialize from cache immediately for responsive UI
+    int todaySteps = prefs.getInt('today_steps') ?? 0;
+    int lastSensorTotal = prefs.getInt('last_sensor_total') ?? 0;
     String lastSavedDate = prefs.getString('last_saved_date') ?? _currentDate();
 
-    if (lastSavedDate != _currentDate()) {
-      baseline = 0;
+    final now = _currentDate();
+    if (lastSavedDate != now) {
+      // New day reset
+      todaySteps = 0;
+      lastSavedDate = now;
+      await prefs.setInt('today_steps', 0);
+      await prefs.setString('last_saved_date', lastSavedDate);
+      // Wait for first sensor event to set lastSensorTotal for the new day
     }
 
-    await for (final totalSteps in _rawStepStream()) {
-      final currentDate = _currentDate();
-      if (lastSavedDate != currentDate || baseline == 0) {
-        baseline = totalSteps;
-        lastSavedDate = currentDate;
-        await prefs.setInt('step_baseline', baseline);
-        await prefs.setString('last_saved_date', lastSavedDate);
+    yield todaySteps;
+
+    // 2. Listen for real-time sensor updates
+    await for (final sensorTotal in _rawStepStream()) {
+      final currentDay = _currentDate();
+
+      if (currentDay != lastSavedDate) {
+        // Handle day change while stream is running
+        todaySteps = 0;
+        lastSavedDate = currentDay;
+        lastSensorTotal = sensorTotal;
+      } else {
+        if (lastSensorTotal == 0) {
+          // Initialize sensor baseline for this session if it's new
+          lastSensorTotal = sensorTotal;
+        } else {
+          int delta = sensorTotal - lastSensorTotal;
+          if (delta > 0) {
+            todaySteps += delta;
+          } else if (delta < 0) {
+            // Reboot case: sensor value is smaller than last recorded total.
+            // We assume the sensor started from 0 again.
+            todaySteps += sensorTotal;
+          }
+          lastSensorTotal = sensorTotal;
+        }
       }
 
-      int steps = totalSteps - baseline;
-      if (steps < 0) {
-        baseline = totalSteps;
-        await prefs.setInt('step_baseline', baseline);
-        steps = 0;
-      }
-      yield steps;
+      // 3. Persist and broadcast the updated count
+      await prefs.setInt('today_steps', todaySteps);
+      await prefs.setInt('last_sensor_total', lastSensorTotal);
+      await prefs.setString('last_saved_date', lastSavedDate);
+
+      yield todaySteps;
     }
   }
 
