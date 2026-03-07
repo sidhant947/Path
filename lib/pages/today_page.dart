@@ -6,12 +6,10 @@ import '../providers/step_provider.dart';
 import 'goal_setup_page.dart';
 
 class TodayPage extends StatefulWidget {
-  final int goal;
   final StepService repository;
   final ValueChanged<int> onNavTap;
   const TodayPage({
     super.key,
-    required this.goal,
     required this.repository,
     required this.onNavTap,
   });

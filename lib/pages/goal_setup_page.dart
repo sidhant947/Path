@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import 'package:provider/provider.dart';
+import '../providers/step_provider.dart';
 import '../utils/step_service.dart';
 import 'main_page.dart';
 
@@ -21,25 +22,32 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
     _loadCurrentGoal();
   }
 
-  void _loadCurrentGoal() async {
-    final goal = await widget.repository.getGoal();
-    if (goal != null) {
-      _controller.text = goal.toString();
+  void _loadCurrentGoal() {
+    final provider = context.read<StepProvider>();
+    if (provider.goal > 0) {
+      _controller.text = provider.goal.toString();
     }
   }
 
   void _saveGoal() async {
     final String text = _controller.text.replaceAll(RegExp(r'[^0-9]'), '');
-    final int? goal = int.tryParse(text);
-    if (goal != null && goal >= 10 && goal <= 1000000) {
-      await widget.repository.saveGoal(goal);
+    final int? goalValue = int.tryParse(text);
+
+    if (goalValue != null && goalValue >= 10 && goalValue <= 1000000) {
+      final provider = context.read<StepProvider>();
+      await provider.updateGoal(goalValue);
+
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MainPage(goal: goal, repository: widget.repository),
-          ),
-        );
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MainPage(repository: widget.repository),
+            ),
+          );
+        }
       }
     } else {
       if (mounted) {

@@ -10,6 +10,7 @@ class StepProvider with ChangeNotifier {
   List<DailyStepRecord> _history = [];
   int _goal = 10000;
   bool _isPermissionGranted = true;
+  bool _isBatteryOptimizationIgnored = true;
   StreamSubscription<int>? _subscription;
 
   StepProvider(this._service) {
@@ -20,18 +21,22 @@ class StepProvider with ChangeNotifier {
   List<DailyStepRecord> get history => _history;
   int get goal => _goal;
   bool get isPermissionGranted => _isPermissionGranted;
+  bool get isBatteryOptimizationIgnored => _isBatteryOptimizationIgnored;
 
   int get streak {
-    if (_history.isEmpty) return 0;
-
     int currentStreak = 0;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
 
-    if (_todaySteps >= _goal) {
+    // Check if user was active today (at least 1 step)
+    if (_todaySteps > 0) {
       currentStreak = 1;
     }
 
+    if (_history.isEmpty) return currentStreak;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Look back through history
     for (int i = 0; i < _history.length; i++) {
       final record = _history[i];
       final recordDate = DateTime(
@@ -40,35 +45,39 @@ class StepProvider with ChangeNotifier {
         record.date.day,
       );
 
+      // Expected date for the current streak count
       final expectedDate = today.subtract(Duration(days: currentStreak));
 
-      if (recordDate == expectedDate && record.steps >= _goal) {
+      // If user was active on this day, increment streak
+      if (recordDate == expectedDate && record.steps > 0) {
         currentStreak++;
       } else if (recordDate.isBefore(expectedDate)) {
+        // We found a gap in the streak
         break;
       }
     }
 
-    return currentStreak > 7 ? 7 : currentStreak;
+    return currentStreak;
   }
 
   Future<void> requestPermission() async {
-    final status = await Permission.activityRecognition.request();
-    _isPermissionGranted = status.isGranted;
+    // 1. Activity Permission
+    final activityStatus = await Permission.activityRecognition.request();
+    _isPermissionGranted = activityStatus.isGranted;
 
     if (_isPermissionGranted) {
       _startStepStream();
 
-      // Request ignore battery optimization for unrestricted background
-      if (await Permission.ignoreBatteryOptimizations.isDenied) {
-        await Permission.ignoreBatteryOptimizations.request();
-      }
+      // 2. Battery Optimization
+      final batteryStatus = await Permission.ignoreBatteryOptimizations
+          .request();
+      _isBatteryOptimizationIgnored = batteryStatus.isGranted;
 
-      // Request notification permission for foreground service on Android 13+
+      // 3. Notification (Android 13+)
       if (await Permission.notification.isDenied) {
         await Permission.notification.request();
       }
-    } else if (status.isPermanentlyDenied) {
+    } else if (activityStatus.isPermanentlyDenied) {
       await openAppSettings();
     }
     notifyListeners();
@@ -76,10 +85,13 @@ class StepProvider with ChangeNotifier {
 
   Future<void> _init() async {
     _goal = await _service.getGoal() ?? 10000;
-    _history = await _service.getHistoricalSteps(7);
+    _history = await _service.getHistoricalSteps(14); // Fetch more for safety
 
-    final status = await Permission.activityRecognition.status;
-    _isPermissionGranted = status.isGranted;
+    final activityStatus = await Permission.activityRecognition.status;
+    _isPermissionGranted = activityStatus.isGranted;
+
+    final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+    _isBatteryOptimizationIgnored = batteryStatus.isGranted;
 
     if (_isPermissionGranted) {
       _startStepStream();

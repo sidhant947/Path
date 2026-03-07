@@ -4,10 +4,9 @@ import 'stats_page.dart';
 import 'today_page.dart';
 
 class MainPage extends StatefulWidget {
-  final int goal;
   final StepService repository;
 
-  const MainPage({super.key, required this.goal, required this.repository});
+  const MainPage({super.key, required this.repository});
   @override
   State<MainPage> createState() => _MainPageState();
 }
@@ -23,7 +22,6 @@ class _MainPageState extends State<MainPage> {
         index: _currentIndex,
         children: [
           TodayPage(
-            goal: widget.goal,
             repository: widget.repository,
             onNavTap: (index) {
               setState(() {
