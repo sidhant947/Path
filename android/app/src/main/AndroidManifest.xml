@@ -1,10 +1,26 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <uses-feature android:name="android.hardware.sensor.stepcounter" />
+
     <application
         android:label="Path"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:enabled="true"
+            android:exported="true"
+            tools:replace="android:exported"
+            android:foregroundServiceType="health" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

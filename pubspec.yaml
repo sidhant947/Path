@@ -41,6 +41,8 @@ dependencies:
   fl_chart: ^1.1.1
   equatable: ^2.0.8
   provider: ^6.1.2
+  flutter_background_service: ^5.1.0
+  device_info_plus: ^12.3.0
 
 dev_dependencies:
   flutter_test:

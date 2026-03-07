@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import '../utils/step_service.dart';
 
 class StepProvider with ChangeNotifier {
@@ -57,6 +58,16 @@ class StepProvider with ChangeNotifier {
 
     if (_isPermissionGranted) {
       _startStepStream();
+
+      // Request ignore battery optimization for unrestricted background
+      if (await Permission.ignoreBatteryOptimizations.isDenied) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+
+      // Request notification permission for foreground service on Android 13+
+      if (await Permission.notification.isDenied) {
+        await Permission.notification.request();
+      }
     } else if (status.isPermanentlyDenied) {
       await openAppSettings();
     }
@@ -79,9 +90,19 @@ class StepProvider with ChangeNotifier {
 
   void _startStepStream() {
     _subscription?.cancel();
+
+    // Initial fetch from service logic
     _subscription = _service.getTodayStepsStream().listen((steps) {
       _todaySteps = steps;
       notifyListeners();
+    });
+
+    // Also listen for updates from the background service isolate
+    FlutterBackgroundService().on('update').listen((event) {
+      if (event != null && event.containsKey('steps')) {
+        _todaySteps = event['steps'];
+        notifyListeners();
+      }
     });
   }
 

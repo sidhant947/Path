@@ -3,12 +3,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 import 'utils/step_service.dart';
+import 'utils/background_service.dart';
 import 'pages/goal_setup_page.dart';
 import 'pages/main_page.dart';
 import 'providers/step_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize background service
+  await initializeService();
+
   final prefs = await SharedPreferences.getInstance();
 
   final repository = StepService(prefs);
