@@ -47,6 +47,13 @@ void onStart(ServiceInstance service) async {
 
   // Start the pedometer listener in the background isolate
   _startStepTracking(stepService, service);
+
+  // Periodic sync with Health storage (to pick up smartwatch steps)
+  Timer.periodic(const Duration(minutes: 10), (timer) async {
+    await stepService.syncWithHealth();
+    final steps = prefs.getInt('today_steps') ?? 0;
+    service.invoke('update', {"steps": steps});
+  });
 }
 
 void _startStepTracking(StepService stepService, ServiceInstance service) {

@@ -118,6 +118,13 @@ class StepProvider with ChangeNotifier {
     });
   }
 
+  Future<void> syncWithHealth() async {
+    await _service.syncWithHealth();
+    // After syncing, we can optionally refresh history too
+    _history = await _service.getHistoricalSteps(14);
+    notifyListeners();
+  }
+
   Future<void> updateGoal(int newGoal) async {
     await _service.saveGoal(newGoal);
     _goal = newGoal;

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:pedometer/pedometer.dart';
+import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:equatable/equatable.dart';
@@ -18,8 +20,38 @@ class DailyStepRecord extends Equatable {
 
 class StepService {
   final SharedPreferences prefs;
+  final Health _health = Health();
 
   StepService(this.prefs);
+
+  Future<void> syncWithHealth() async {
+    if (Platform.isLinux) return;
+
+    final types = [HealthDataType.STEPS];
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+
+    try {
+      bool hasPermission = await _health.hasPermissions(types) ?? false;
+      if (!hasPermission) {
+        hasPermission = await _health.requestAuthorization(types);
+      }
+
+      if (hasPermission) {
+        final healthSteps = await _health.getTotalStepsInInterval(start, now);
+        if (healthSteps != null) {
+          int currentSteps = prefs.getInt('today_steps') ?? 0;
+          // We take the max of what we have and what health storage has
+          // This ensures if the watch has more steps, it's reflected
+          if (healthSteps > currentSteps) {
+            await prefs.setInt('today_steps', healthSteps);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error syncing with health: $e");
+    }
+  }
 
   String _currentDate() {
     final now = DateTime.now();
@@ -58,6 +90,9 @@ class StepService {
   }
 
   Stream<int> getTodayStepsStream() async* {
+    // 0. Sync with Health storage (to pick up watch steps)
+    await syncWithHealth();
+
     // 1. Initialize from cache
     int todaySteps = prefs.getInt('today_steps') ?? 0;
     int lastSensorTotal = prefs.getInt('last_sensor_total') ?? 0;
