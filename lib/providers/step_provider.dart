@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../utils/step_service.dart';
 
 class StepProvider with ChangeNotifier {
@@ -106,18 +106,14 @@ class StepProvider with ChangeNotifier {
   void _startStepStream() {
     _subscription?.cancel();
 
-    // Initial fetch from service logic
+    // Listen to real-time step count from the main app's StepService
     _subscription = _service.getTodayStepsStream().listen((steps) {
       _todaySteps = steps;
       notifyListeners();
-    });
 
-    // Also listen for updates from the background service isolate
-    FlutterBackgroundService().on('update').listen((event) {
-      if (event != null && event.containsKey('steps')) {
-        _todaySteps = event['steps'];
-        notifyListeners();
-      }
+      // Broadcast steps to background service so notification stays updated
+      final service = FlutterBackgroundService();
+      service.invoke('steps_update', {'steps': steps, 'goal': _goal});
     });
   }
 
@@ -125,12 +121,22 @@ class StepProvider with ChangeNotifier {
     await _service.syncWithHealth();
     // After syncing, we can optionally refresh history too
     _history = await _service.getHistoricalSteps(14);
+
+    // Broadcast updated steps to background service
+    final service = FlutterBackgroundService();
+    service.invoke('steps_update', {'steps': _todaySteps, 'goal': _goal});
+
     notifyListeners();
   }
 
   Future<void> updateGoal(int newGoal) async {
     await _service.saveGoal(newGoal);
     _goal = newGoal;
+
+    // Broadcast updated goal to background service
+    final service = FlutterBackgroundService();
+    service.invoke('steps_update', {'steps': _todaySteps, 'goal': _goal});
+
     notifyListeners();
   }
 

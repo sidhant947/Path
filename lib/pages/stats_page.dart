@@ -1,5 +1,5 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -66,7 +66,7 @@ class _StatsPageState extends State<StatsPage> {
                       const SizedBox(height: 16),
                       SizedBox(
                         height: 250,
-                        child: _buildChart(chartRecords, goal),
+                        child: _buildWaveChart(chartRecords, goal),
                       ),
                       const SizedBox(height: 24),
                       ...displayRecords.map(
@@ -205,87 +205,74 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildChart(List<DailyStepRecord> records, int goal) {
-    if (records.isEmpty) return const SizedBox.shrink();
+  Widget _buildWaveChart(List<DailyStepRecord> records, int goal) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final maxStepsInRecords = records
-        .map((e) => e.steps)
-        .reduce((a, b) => a > b ? a : b)
-        .toDouble();
+    // Empty state: no history at all (just today with 0 steps)
+    if (records.isEmpty) {
+      return _buildEmptyChartPlaceholder(isDark);
+    }
 
-    final double chartMaxY =
-        (maxStepsInRecords > goal ? maxStepsInRecords : goal.toDouble()) * 1.5;
+    // Single data point (first day, no history yet)
+    if (records.length == 1) {
+      final todayRecord = records.first;
+      if (todayRecord.steps == 0) {
+        return _buildEmptyChartPlaceholder(isDark);
+      }
+    }
 
-    final spots = records.asMap().entries.map((e) {
-      return FlSpot(e.key.toDouble(), e.value.steps.toDouble());
-    }).toList();
+    // Find max steps to determine Y axis scale
+    double maxSteps = 0;
+    for (final record in records) {
+      if (record.steps.toDouble() > maxSteps) {
+        maxSteps = record.steps.toDouble();
+      }
+    }
+    // Add 20% headroom so the highest point isn't at the very top
+    maxSteps = maxSteps * 1.2;
+    if (maxSteps == 0) maxSteps = 10000;
 
     return Container(
-      clipBehavior: Clip.none,
+      height: 250,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFC7F900),
         borderRadius: BorderRadius.circular(24),
       ),
-      padding: const EdgeInsets.only(top: 48, bottom: 16, left: 16, right: 16),
-      child: LineChart(
-        LineChartData(
-          minY: 0,
-          maxY: chartMaxY,
-          gridData: const FlGridData(show: false),
-          titlesData: const FlTitlesData(show: false),
-          borderData: FlBorderData(show: false),
-          extraLinesData: ExtraLinesData(
-            horizontalLines: [
-              HorizontalLine(
-                y: goal.toDouble(),
-                color: Colors.black.withValues(alpha: 0.4),
-                strokeWidth: 2,
-                dashArray: [5, 5],
-                label: HorizontalLineLabel(
-                  show: true,
-                  style: TextStyle(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    fontWeight: FontWeight.bold,
-                  ),
-                  alignment: Alignment.topRight,
-                  labelResolver: (line) => 'Goal',
-                ),
-              ),
-            ],
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              curveSmoothness: 0.35,
-              color: Colors.black,
-              barWidth: 3,
-              isStrokeCapRound: true,
-              dotData: const FlDotData(show: true),
-              belowBarData: BarAreaData(
-                show: true,
-                color: Colors.black.withValues(alpha: 0.1),
-              ),
-            ),
-          ],
-          lineTouchData: LineTouchData(
-            enabled: true,
-            touchTooltipData: LineTouchTooltipData(
-              fitInsideHorizontally: true,
-              getTooltipItems: (touchedSpots) {
-                return touchedSpots.map((spot) {
-                  return LineTooltipItem(
-                    _numberFormat.format(spot.y.toInt()),
-                    const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                }).toList();
-              },
-            ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: _GoalWaveChartPainter(
+            records: records,
+            goal: goal.toDouble(),
+            maxSteps: maxSteps,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyChartPlaceholder(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.directions_walk,
+            size: 48,
+            color: isDark ? Colors.grey[800] : Colors.grey[300],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Start walking to see your stats!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -339,4 +326,141 @@ class _StatsPageState extends State<StatsPage> {
       ),
     );
   }
+}
+
+/// Smooth wave chart painter with goal line matching the reference design
+class _GoalWaveChartPainter extends CustomPainter {
+  final List<DailyStepRecord> records;
+  final double goal;
+  final double maxSteps;
+
+  _GoalWaveChartPainter({
+    required this.records,
+    required this.goal,
+    required this.maxSteps,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (records.isEmpty) return;
+
+    final padding = 16.0;
+    final chartWidth = size.width - padding * 2;
+    final chartHeight = size.height - padding * 2;
+
+    // Helper: convert steps to Y position (inverted because canvas Y goes down)
+    double stepsToY(double steps) {
+      return padding + chartHeight - (steps / maxSteps) * chartHeight;
+    }
+
+    // Helper: convert index to X position
+    double indexToX(int index) {
+      if (records.length == 1) return padding + chartWidth / 2;
+      return padding + (index / (records.length - 1)) * chartWidth;
+    }
+
+    // Calculate control points for smooth Catmull-Rom spline
+    final points = <Offset>[];
+    for (int i = 0; i < records.length; i++) {
+      final x = indexToX(i);
+      final y = stepsToY(records[i].steps.toDouble());
+      points.add(Offset(x, y));
+    }
+
+    // Build smooth path using cubic bezier curves
+    final path = Path();
+    path.moveTo(points.first.dx, points.first.dy);
+
+    if (points.length > 1) {
+      for (int i = 0; i < points.length - 1; i++) {
+        final p0 = i > 0 ? points[i - 1] : points[i];
+        final p1 = points[i];
+        final p2 = points[i + 1];
+        final p3 = i < points.length - 2 ? points[i + 2] : p2;
+
+        // Catmull-Rom to cubic bezier conversion
+        final tension = 0.3;
+        final cp1x = p1.dx + (p2.dx - p0.dx) * tension;
+        final cp1y = p1.dy + (p2.dy - p0.dy) * tension;
+        final cp2x = p2.dx - (p3.dx - p1.dx) * tension;
+        final cp2y = p2.dy - (p3.dy - p1.dy) * tension;
+
+        path.cubicTo(cp1x, cp1y, cp2x, cp2y, p2.dx, p2.dy);
+      }
+    }
+
+    // Draw area fill (darker shade below curve)
+    final areaPath = Path.from(path);
+    areaPath.lineTo(points.last.dx, padding + chartHeight);
+    areaPath.lineTo(points.first.dx, padding + chartHeight);
+    areaPath.close();
+
+    final areaPaint = Paint()
+      ..color = const Color(0xFFB0E000)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(areaPath, areaPaint);
+
+    // Draw the wave line (thick black)
+    final linePaint = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, linePaint);
+
+    // Draw black dots at each data point
+    final dotPaint = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.fill;
+    for (final point in points) {
+      canvas.drawCircle(point, 5.0, dotPaint);
+    }
+
+    // Draw dashed goal line
+    final goalY = stepsToY(goal);
+    if (goalY >= padding && goalY <= padding + chartHeight) {
+      final dashedLinePaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+
+      const dashWidth = 8.0;
+      const dashGap = 6.0;
+      double startX = padding;
+      while (startX < padding + chartWidth) {
+        final endX = startX + dashWidth;
+        if (endX <= padding + chartWidth) {
+          canvas.drawLine(
+            Offset(startX, goalY),
+            Offset(endX, goalY),
+            dashedLinePaint,
+          );
+        }
+        startX += dashWidth + dashGap;
+      }
+
+      // Draw "Goal" label
+      final textPainter = TextPainter(
+        text: const TextSpan(
+          text: 'Goal',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      );
+      textPainter.layout();
+      final labelX = padding + chartWidth - textPainter.width - 4;
+      final labelY = goalY - textPainter.height - 6;
+      textPainter.paint(canvas, Offset(labelX, labelY));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GoalWaveChartPainter oldDelegate) =>
+      oldDelegate.records != records ||
+      oldDelegate.goal != goal ||
+      oldDelegate.maxSteps != maxSteps;
 }
