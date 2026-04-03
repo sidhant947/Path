@@ -221,12 +221,12 @@ class _StatsPageState extends State<StatsPage> {
     }).toList();
 
     return Container(
-      clipBehavior: Clip.antiAlias,
+      clipBehavior: Clip.none,
       decoration: BoxDecoration(
         color: const Color(0xFFC7F900),
         borderRadius: BorderRadius.circular(24),
       ),
-      padding: const EdgeInsets.only(top: 48, bottom: 0, left: 0, right: 0),
+      padding: const EdgeInsets.only(top: 48, bottom: 16, left: 16, right: 16),
       child: LineChart(
         LineChartData(
           minY: 0,
@@ -268,8 +268,23 @@ class _StatsPageState extends State<StatsPage> {
               ),
             ),
           ],
-          clipData: const FlClipData.all(),
-          lineTouchData: const LineTouchData(enabled: true),
+          lineTouchData: LineTouchData(
+            enabled: true,
+            touchTooltipData: LineTouchTooltipData(
+              fitInsideHorizontally: true,
+              getTooltipItems: (touchedSpots) {
+                return touchedSpots.map((spot) {
+                  return LineTooltipItem(
+                    _numberFormat.format(spot.y.toInt()),
+                    const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                }).toList();
+              },
+            ),
+          ),
         ),
       ),
     );

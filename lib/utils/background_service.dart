@@ -6,6 +6,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'step_service.dart';
+import 'activity_detection_service.dart';
 
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
@@ -43,7 +44,8 @@ void onStart(ServiceInstance service) async {
 
   // Step Tracking Logic
   final prefs = await SharedPreferences.getInstance();
-  final stepService = StepService(prefs);
+  final activityDetection = ActivityDetectionService();
+  final stepService = StepService(prefs, activityDetection: activityDetection);
 
   // Start the pedometer listener in the background isolate
   _startStepTracking(stepService, service);

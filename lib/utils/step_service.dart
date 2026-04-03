@@ -7,6 +7,7 @@ import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:equatable/equatable.dart';
+import 'activity_detection_service.dart';
 
 class DailyStepRecord extends Equatable {
   final DateTime date;
@@ -21,8 +22,29 @@ class DailyStepRecord extends Equatable {
 class StepService {
   final SharedPreferences prefs;
   final Health _health = Health();
+  final ActivityDetectionService _activityDetection;
 
-  StepService(this.prefs);
+  /// Whether the user is currently detected as being in a vehicle
+  bool _isInVehicle = false;
+
+  StepService(this.prefs, {ActivityDetectionService? activityDetection})
+    : _activityDetection = activityDetection ?? ActivityDetectionService() {
+    _initActivityDetection();
+  }
+
+  void _initActivityDetection() {
+    _activityDetection.isInVehicleStream.listen((inVehicle) {
+      _isInVehicle = inVehicle;
+      if (inVehicle) {
+        debugPrint('StepService: User is in vehicle, ignoring step counts');
+      } else {
+        debugPrint(
+          'StepService: User is no longer in vehicle, resuming step counts',
+        );
+      }
+    });
+    _activityDetection.start();
+  }
 
   Future<void> syncWithHealth() async {
     if (Platform.isLinux) return;
@@ -113,6 +135,13 @@ class StepService {
 
     // 2. Listen for real-time sensor updates
     await for (final sensorTotal in _rawStepStream()) {
+      // Skip step counting if user is detected to be in a vehicle
+      if (_isInVehicle) {
+        // Still update lastSensorTotal to avoid counting vehicle steps when exiting
+        lastSensorTotal = sensorTotal;
+        continue;
+      }
+
       final currentDay = _currentDate();
 
       if (currentDay != lastSavedDate) {
