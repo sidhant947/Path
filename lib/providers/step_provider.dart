@@ -13,8 +13,11 @@ class StepProvider with ChangeNotifier {
   bool _isBatteryOptimizationIgnored = true;
   StreamSubscription<int>? _subscription;
 
-  StepProvider(this._service) {
-    _init();
+  StepProvider(this._service);
+
+  /// Must be called after the widget is built (e.g., via addPostFrameCallback)
+  Future<void> init() async {
+    await _init();
   }
 
   int get todaySteps => _todaySteps;

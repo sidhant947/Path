@@ -30,12 +30,14 @@ class ActivityDetectionService {
 
     try {
       // Start listening to activity updates
+      // Note: runForegroundService is set to false because we use flutter_background_service
       _activitySubscription = _activityRecognition
           .activityStream(runForegroundService: false)
           .listen(
             _handleActivityUpdate,
             onError: (error) {
               debugPrint('$_logTag: Error receiving activity updates: $error');
+              // Don't cancel on error, just log it
             },
             cancelOnError: false,
           );

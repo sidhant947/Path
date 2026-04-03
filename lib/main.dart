@@ -19,12 +19,19 @@ void main() async {
   final repository = StepService(prefs);
   final goal = await repository.getGoal();
 
+  final stepProvider = StepProvider(repository);
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => StepProvider(repository),
+    ChangeNotifierProvider<StepProvider>.value(
+      value: stepProvider,
       child: MyApp(initialGoal: goal, repository: repository),
     ),
   );
+
+  // Initialize provider after first frame is built
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    stepProvider.init();
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -49,12 +56,14 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Space Grotesk',
       ),
       themeMode: ThemeMode.system,
-      home: PermissionWrapper(
-        child:
-            (initialGoal == null
-                    ? GoalSetupPage(repository: repository)
-                    : MainPage(repository: repository))
-                as Widget,
+      home: Builder(
+        builder: (context) => PermissionWrapper(
+          child:
+              (initialGoal == null
+                      ? GoalSetupPage(repository: repository)
+                      : MainPage(repository: repository))
+                  as Widget,
+        ),
       ),
     );
   }
@@ -66,7 +75,18 @@ class PermissionWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stepProvider = context.watch<StepProvider>();
+    StepProvider? stepProvider;
+    try {
+      stepProvider = context.watch<StepProvider>();
+    } catch (e) {
+      // Provider not available yet
+    }
+
+    // If provider is not available yet, show the child without permission checks
+    if (stepProvider == null) {
+      return child;
+    }
+
     final isPermissionGranted = stepProvider.isPermissionGranted;
     final isBatteryOptimizationIgnored =
         stepProvider.isBatteryOptimizationIgnored;
@@ -138,7 +158,7 @@ class PermissionWrapper extends StatelessWidget {
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton(
-                    onPressed: () => stepProvider.requestPermission(),
+                    onPressed: () => stepProvider?.requestPermission(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFC7F900),
                       foregroundColor: Colors.black,
