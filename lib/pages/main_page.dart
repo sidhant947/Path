@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/step_provider.dart';
 import '../utils/step_service.dart';
 import 'stats_page.dart';
 import 'today_page.dart';
@@ -27,8 +29,13 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // App lifecycle handling
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (state == AppLifecycleState.resumed) {
+      await widget.repository.prefs.reload();
+      if (mounted) {
+        context.read<StepProvider>().refresh();
+      }
+    }
   }
 
   @override

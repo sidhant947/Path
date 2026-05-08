@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/step_provider.dart';
 import '../utils/step_service.dart';
+import '../utils/background_service.dart';
 import 'main_page.dart';
 
 class GoalSetupPage extends StatefulWidget {
@@ -36,6 +37,9 @@ class _GoalSetupPageState extends State<GoalSetupPage> {
     if (goalValue != null && goalValue >= 10 && goalValue <= 1000000) {
       final provider = context.read<StepProvider>();
       await provider.updateGoal(goalValue);
+
+      // Start background service if not already started
+      await initializeService();
 
       if (mounted) {
         if (Navigator.canPop(context)) {

@@ -12,14 +12,16 @@ import 'providers/step_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize background service
-  await initializeService();
-
   final prefs = await SharedPreferences.getInstance();
 
   final repository = StepService(prefs);
   final goal = await repository.getGoal();
   final hasCompletedOnboarding = prefs.getBool('onboarding_complete') ?? false;
+
+  // Initialize background service only if onboarding is complete
+  if (hasCompletedOnboarding) {
+    await initializeService();
+  }
 
   final stepProvider = StepProvider(repository);
 

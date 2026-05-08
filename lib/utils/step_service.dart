@@ -48,9 +48,18 @@ class StepService {
   }
 
   Stream<int> _rawStepStream() async* {
-    if (!Platform.isLinux &&
-        await Permission.activityRecognition.isGranted) {
-      yield* Pedometer.stepCountStream.map((event) => event.steps);
+    if (Platform.isLinux) return;
+
+    while (true) {
+      if (await Permission.activityRecognition.isGranted) {
+        try {
+          yield* Pedometer.stepCountStream.map((event) => event.steps);
+        } catch (e) {
+          debugPrint('StepService: Pedometer stream error: $e');
+        }
+      }
+      // Wait before checking again if stream closed or permission not granted
+      await Future.delayed(const Duration(seconds: 5));
     }
   }
 

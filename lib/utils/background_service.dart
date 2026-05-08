@@ -41,6 +41,7 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 void onStart(ServiceInstance service) async {
   try {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload(); // Ensure we have latest data across isolates
     final stepService = StepService(prefs);
 
     // Read initial values
@@ -73,10 +74,15 @@ void onStart(ServiceInstance service) async {
 
     startTracking();
 
-    // Periodically refresh notification to keep it visible and check for goal changes
+    // Periodically refresh notification to keep it visible
+    int lastDay = DateTime.now().day;
     final refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      goal = prefs.getInt('daily_goal') ?? 10000;
-      _updateNotification(service, currentSteps, goal);
+      if (DateTime.now().day != lastDay) {
+        lastDay = DateTime.now().day;
+        startTracking(); // Re-trigger StepService to handle date change and reset to 0
+      } else {
+        _updateNotification(service, currentSteps, goal);
+      }
     });
 
     stopSubscription = service.on('stopService').listen((event) {
@@ -92,10 +98,12 @@ void onStart(ServiceInstance service) async {
     updateSubscription = service.on('steps_update').listen((event) {
       final data = event;
       final newGoal = data?['goal'] as int?;
-      if (newGoal != null) goal = newGoal;
+      if (newGoal != null) {
+        goal = newGoal;
+        debugPrint("Background service: Goal updated to $goal");
+      }
 
       _updateNotification(service, currentSteps, goal);
-      debugPrint("Notification updated (broadcast): $currentSteps steps, goal: $goal");
     });
   } catch (e) {
     debugPrint("Background service onStart error: $e");

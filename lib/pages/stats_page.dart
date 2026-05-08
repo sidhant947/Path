@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -65,8 +66,8 @@ class _StatsPageState extends State<StatsPage> {
                         _buildEncouragementMessage(todaySteps, goal, isDark),
                       const SizedBox(height: 16),
                       SizedBox(
-                        height: 250,
-                        child: _buildWaveChart(chartRecords, goal),
+                        height: 300,
+                        child: _buildProgressRings(chartRecords, goal),
                       ),
                       const SizedBox(height: 24),
                       ...displayRecords.map(
@@ -205,51 +206,74 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildWaveChart(List<DailyStepRecord> records, int goal) {
+  Widget _buildProgressRings(List<DailyStepRecord> records, int goal) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Empty state: no history at all (just today with 0 steps)
     if (records.isEmpty) {
       return _buildEmptyChartPlaceholder(isDark);
     }
 
-    // Single data point (first day, no history yet)
-    if (records.length == 1) {
-      final todayRecord = records.first;
-      if (todayRecord.steps == 0) {
-        return _buildEmptyChartPlaceholder(isDark);
-      }
-    }
-
-    // Find max steps to determine Y axis scale
-    double maxSteps = 0;
-    for (final record in records) {
-      if (record.steps.toDouble() > maxSteps) {
-        maxSteps = record.steps.toDouble();
-      }
-    }
-    // Add 20% headroom so the highest point isn't at the very top
-    maxSteps = maxSteps * 1.2;
-    if (maxSteps == 0) maxSteps = 10000;
-
     return Container(
-      height: 250,
+      height: 300,
       margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFC7F900),
+        color: isDark ? Colors.grey[900] : Colors.grey[100],
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: CustomPaint(
-          size: Size.infinite,
-          painter: _GoalWaveChartPainter(
-            records: records,
-            goal: goal.toDouble(),
-            maxSteps: maxSteps,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _ConcentricRingsPainter(
+                records: records,
+                goal: goal.toDouble(),
+                isDark: isDark,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 16,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem('Today', const Color(0xFFC7F900), isDark),
+                const SizedBox(width: 16),
+                _buildLegendItem(
+                  'Past 7 Days',
+                  const Color(0xFFC7F900).withValues(alpha: 0.4),
+                  isDark,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color, bool isDark) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white54 : Colors.black54,
+            letterSpacing: 0.5,
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -328,139 +352,93 @@ class _StatsPageState extends State<StatsPage> {
   }
 }
 
-/// Smooth wave chart painter with goal line matching the reference design
-class _GoalWaveChartPainter extends CustomPainter {
+class _ConcentricRingsPainter extends CustomPainter {
   final List<DailyStepRecord> records;
   final double goal;
-  final double maxSteps;
+  final bool isDark;
 
-  _GoalWaveChartPainter({
+  _ConcentricRingsPainter({
     required this.records,
     required this.goal,
-    required this.maxSteps,
+    required this.isDark,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (records.isEmpty) return;
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = (size.width < size.height ? size.width : size.height) / 2;
 
-    final padding = 16.0;
-    final chartWidth = size.width - padding * 2;
-    final chartHeight = size.height - padding * 2;
+    final ringWidth = maxRadius / (records.length + 1.5);
+    final spacing = 4.0;
 
-    // Helper: convert steps to Y position (inverted because canvas Y goes down)
-    double stepsToY(double steps) {
-      return padding + chartHeight - (steps / maxSteps) * chartHeight;
-    }
-
-    // Helper: convert index to X position
-    double indexToX(int index) {
-      if (records.length == 1) return padding + chartWidth / 2;
-      return padding + (index / (records.length - 1)) * chartWidth;
-    }
-
-    // Calculate control points for smooth Catmull-Rom spline
-    final points = <Offset>[];
     for (int i = 0; i < records.length; i++) {
-      final x = indexToX(i);
-      final y = stepsToY(records[i].steps.toDouble());
-      points.add(Offset(x, y));
-    }
+      final record =
+          records[records.length - 1 - i]; // Outer to inner (Today to past)
+      final progress = (record.steps / goal).clamp(
+        0.0,
+        1.5,
+      ); // Allow slight overflow visual
 
-    // Build smooth path using cubic bezier curves
-    final path = Path();
-    path.moveTo(points.first.dx, points.first.dy);
+      final radius = maxRadius - (i * (ringWidth + spacing));
 
-    if (points.length > 1) {
-      for (int i = 0; i < points.length - 1; i++) {
-        final p0 = i > 0 ? points[i - 1] : points[i];
-        final p1 = points[i];
-        final p2 = points[i + 1];
-        final p3 = i < points.length - 2 ? points[i + 2] : p2;
-
-        // Catmull-Rom to cubic bezier conversion
-        final tension = 0.3;
-        final cp1x = p1.dx + (p2.dx - p0.dx) * tension;
-        final cp1y = p1.dy + (p2.dy - p0.dy) * tension;
-        final cp2x = p2.dx - (p3.dx - p1.dx) * tension;
-        final cp2y = p2.dy - (p3.dy - p1.dy) * tension;
-
-        path.cubicTo(cp1x, cp1y, cp2x, cp2y, p2.dx, p2.dy);
-      }
-    }
-
-    // Draw area fill (darker shade below curve)
-    final areaPath = Path.from(path);
-    areaPath.lineTo(points.last.dx, padding + chartHeight);
-    areaPath.lineTo(points.first.dx, padding + chartHeight);
-    areaPath.close();
-
-    final areaPaint = Paint()
-      ..color = const Color(0xFFB0E000)
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(areaPath, areaPaint);
-
-    // Draw the wave line (thick black)
-    final linePaint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, linePaint);
-
-    // Draw black dots at each data point
-    final dotPaint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.fill;
-    for (final point in points) {
-      canvas.drawCircle(point, 5.0, dotPaint);
-    }
-
-    // Draw dashed goal line
-    final goalY = stepsToY(goal);
-    if (goalY >= padding && goalY <= padding + chartHeight) {
-      final dashedLinePaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.35)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-
-      const dashWidth = 8.0;
-      const dashGap = 6.0;
-      double startX = padding;
-      while (startX < padding + chartWidth) {
-        final endX = startX + dashWidth;
-        if (endX <= padding + chartWidth) {
-          canvas.drawLine(
-            Offset(startX, goalY),
-            Offset(endX, goalY),
-            dashedLinePaint,
-          );
-        }
-        startX += dashWidth + dashGap;
-      }
-
-      // Draw "Goal" label
-      final textPainter = TextPainter(
-        text: const TextSpan(
-          text: 'Goal',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        textDirection: ui.TextDirection.ltr,
+      // Color: Outer is bright lime, inner rings are progressively more transparent/darker
+      final opacity = 1.0 - (i * 0.12);
+      final color = const Color(0xFFC7F900).withValues(
+        alpha: opacity.clamp(0.2, 1.0),
       );
-      textPainter.layout();
-      final labelX = padding + chartWidth - textPainter.width - 4;
-      final labelY = goalY - textPainter.height - 6;
-      textPainter.paint(canvas, Offset(labelX, labelY));
+
+      final backgroundPaint = Paint()
+        ..color = isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.black.withValues(alpha: 0.05)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = ringWidth
+        ..strokeCap = StrokeCap.round;
+
+      final progressPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = ringWidth
+        ..strokeCap = StrokeCap.round;
+
+      // Draw background track
+      canvas.drawCircle(center, radius, backgroundPaint);
+
+      // Draw progress arc
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -3.14159 / 2, // Start from top
+        progress * 2 * 3.14159,
+        false,
+        progressPaint,
+      );
+
+      // Add a small day label if it's the outermost or every few rings
+      if (i == 0 || i == records.length - 1) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: i == 0 ? 'T' : '7d',
+            style: TextStyle(
+              color: isDark ? Colors.white38 : Colors.black38,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          textDirection: ui.TextDirection.ltr,
+        );
+        textPainter.layout();
+        textPainter.paint(
+          canvas,
+          Offset(
+            center.dx - textPainter.width / 2,
+            center.dy - radius - textPainter.height / 2,
+          ),
+        );
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _GoalWaveChartPainter oldDelegate) =>
-      oldDelegate.records != records ||
-      oldDelegate.goal != goal ||
-      oldDelegate.maxSteps != maxSteps;
+  bool shouldRepaint(covariant _ConcentricRingsPainter oldDelegate) =>
+      !listEquals(oldDelegate.records, records) || oldDelegate.goal != goal;
 }

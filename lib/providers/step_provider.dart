@@ -13,12 +13,19 @@ class StepProvider with ChangeNotifier {
   bool _isBatteryOptimizationIgnored = true;
   StreamSubscription<int>? _subscription;
   StreamSubscription? _backgroundSubscription;
+  DateTime _lastBackgroundUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
   StepProvider(this._service);
 
   /// Must be called after the widget is built (e.g., via addPostFrameCallback)
   Future<void> init() async {
     await _init();
+  }
+
+  Future<void> refresh() async {
+    _goal = await _service.getGoal() ?? 10000;
+    _history = await _service.getHistoricalSteps(14);
+    notifyListeners();
   }
 
   int get todaySteps => _todaySteps;
@@ -97,11 +104,8 @@ class StepProvider with ChangeNotifier {
     final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
     _isBatteryOptimizationIgnored = batteryStatus.isGranted;
 
-    if (_isPermissionGranted) {
-      _startStepStream();
-    } else {
-      notifyListeners();
-    }
+    // Always start stream, StepService now handles waiting for permission
+    _startStepStream();
   }
 
   void _startStepStream() {
@@ -110,8 +114,13 @@ class StepProvider with ChangeNotifier {
 
     // 1. Listen to real-time step count from the main app's StepService
     _subscription = _service.getTodayStepsStream().listen((steps) {
-      _todaySteps = steps;
-      notifyListeners();
+      // Prioritize background service steps if it's active
+      if (DateTime.now().difference(_lastBackgroundUpdate).inSeconds > 5) {
+        if (_todaySteps != steps) {
+          _todaySteps = steps;
+          notifyListeners();
+        }
+      }
 
       // Broadcast steps to background service if it needs manual updates
       final service = FlutterBackgroundService();
@@ -122,6 +131,7 @@ class StepProvider with ChangeNotifier {
     // This ensures UI stays in sync even if the main stream has issues
     _backgroundSubscription = FlutterBackgroundService().on('steps_updated_in_background').listen((event) {
       if (event != null) {
+        _lastBackgroundUpdate = DateTime.now();
         final steps = event['steps'] as int? ?? _todaySteps;
         if (steps != _todaySteps) {
           _todaySteps = steps;
