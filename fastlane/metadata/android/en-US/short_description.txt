@@ -1,1 +1,1 @@
-Track Your Steps, Reach Your Goals
+Lightweight, privacy-first step tracker. No tracking, no ads, 100% open source.

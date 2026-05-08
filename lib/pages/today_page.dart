@@ -63,19 +63,23 @@ class _TodayPageState extends State<TodayPage> {
               color: limeColor,
             ),
           ),
-          _buildForeground(
-            context,
-            textColor: textColor,
-            steps: steps,
-            goal: goal,
+          RepaintBoundary(
+            child: _buildForeground(
+              context,
+              textColor: textColor,
+              steps: steps,
+              goal: goal,
+            ),
           ),
           ClipRect(
             clipper: _BottomFillClipper(percentage),
-            child: _buildForeground(
-              context,
-              textColor: Colors.black,
-              steps: steps,
-              goal: goal,
+            child: RepaintBoundary(
+              child: _buildForeground(
+                context,
+                textColor: Colors.black,
+                steps: steps,
+                goal: goal,
+              ),
             ),
           ),
         ],

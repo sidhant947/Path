@@ -1,8 +1,20 @@
-Path is a lightweight, open-source step tracking application designed with a focus on privacy and simplicity. Track your daily activity without unnecessary bloat or data collection.
+Path is a lightweight, open-source step tracking application designed with a focus on privacy and simplicity. Track your daily activity without unnecessary bloat, ads, or data collection.
 
-## Features
+WHY CHOOSE PATH?
 
-- **Privacy First**: All data is stored locally on your device.
-- **Battery Efficient**: Uses hardware sensors to minimize power consumption.
-- **Clean UI**: Simple visualizations of your daily and weekly progress.
-- **Open Source**: Transparent codebase and community-driven.
+• Privacy First: All data is stored locally on your device. No accounts, no cloud servers, and no tracking. Your activity is your business.
+• Google-Free: Built to work on any Android device, including de-googled ones. Path does not rely on Google Play Services for step counting or motion detection.
+• Intelligent Motion: Our custom motion classifier intelligently detects when you are in a vehicle or on a bicycle, ensuring your step count only reflects your actual walking activity.
+• Battery Efficient: Path uses hardware sensors and optimized background processing to track your steps with minimal impact on your battery life.
+• Beautiful Visualization: Enjoy a minimalist design with a unique progress visualization that makes reaching your goals satisfying.
+• Open Source: Transparent codebase that anyone can audit. We believe in software you can trust.
+
+FEATURES
+
+• Real-time step counting via hardware sensors.
+• 14-day historical activity view.
+• Customizable daily step goals.
+• Persistent background tracking.
+• Zero advertisements and zero telemetry.
+
+Take the first step toward a more private and active lifestyle with Path.

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/step_provider.dart';
 import '../utils/step_service.dart';
 import 'stats_page.dart';
 import 'today_page.dart';
@@ -30,10 +28,7 @@ class _MainPageState extends State<MainPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Background sync when app comes to foreground
-      context.read<StepProvider>().syncWithHealth();
-    }
+    // App lifecycle handling
   }
 
   @override

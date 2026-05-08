@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:pedometer/pedometer.dart';
-import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:equatable/equatable.dart';
@@ -21,56 +20,21 @@ class DailyStepRecord extends Equatable {
 
 class StepService {
   final SharedPreferences prefs;
-  final Health _health = Health();
   final MotionDetectionService _motionDetection;
 
-  /// Whether motion pattern suggests vehicle/bicycle (used to pause step deltas)
+  /// Whether motion pattern suggests vehicle/bicycle
   bool _isInVehicle = false;
 
   StepService(this.prefs, {MotionDetectionService? motionDetection})
-      : _motionDetection = motionDetection ?? MotionDetectionService() {
+    : _motionDetection = motionDetection ?? MotionDetectionService() {
     _initMotionDetection();
   }
 
   void _initMotionDetection() {
     _motionDetection.isInVehicleStream.listen((inVehicle) {
       _isInVehicle = inVehicle;
-      if (inVehicle) {
-        debugPrint('StepService: Motion looks like vehicle/bike, pausing step deltas');
-      } else {
-        debugPrint('StepService: Motion back to on-foot, resuming step deltas');
-      }
     });
     _motionDetection.start();
-  }
-
-  Future<void> syncWithHealth() async {
-    if (Platform.isLinux) return;
-
-    final types = [HealthDataType.STEPS];
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day);
-
-    try {
-      bool hasPermission = await _health.hasPermissions(types) ?? false;
-      if (!hasPermission) {
-        hasPermission = await _health.requestAuthorization(types);
-      }
-
-      if (hasPermission) {
-        final healthSteps = await _health.getTotalStepsInInterval(start, now);
-        if (healthSteps != null) {
-          int currentSteps = prefs.getInt('today_steps') ?? 0;
-          // We take the max of what we have and what health storage has
-          // This ensures if the watch has more steps, it's reflected
-          if (healthSteps > currentSteps) {
-            await prefs.setInt('today_steps', healthSteps);
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint("Error syncing with health: $e");
-    }
   }
 
   String _currentDate() {
@@ -78,22 +42,22 @@ class StepService {
     return "${now.year}-${now.month}-${now.day}";
   }
 
+  DateTime _parseDate(String dateStr) {
+    final parts = dateStr.split('-');
+    return DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+  }
+
   Stream<int> _rawStepStream() async* {
     if (!Platform.isLinux &&
-        await Permission.activityRecognition.request().isGranted) {
+        await Permission.activityRecognition.isGranted) {
       yield* Pedometer.stepCountStream.map((event) => event.steps);
-    } else {
-      // Return empty stream if not supported/granted
-      return;
     }
   }
 
   Future<void> _storeStepInHistory(String date, int steps) async {
     final history = prefs.getStringList('step_history') ?? [];
-    // Format: "YYYY-MM-DD:STEPS"
     final record = "$date:$steps";
 
-    // Check if we already have a record for this date (updating it)
     int existingIndex = history.indexWhere((e) => e.startsWith("$date:"));
     if (existingIndex != -1) {
       history[existingIndex] = record;
@@ -101,7 +65,6 @@ class StepService {
       history.insert(0, record);
     }
 
-    // Limit to 14 days for safety
     if (history.length > 20) {
       history.removeRange(20, history.length);
     }
@@ -109,63 +72,86 @@ class StepService {
     await prefs.setStringList('step_history', history);
   }
 
-  Stream<int> getTodayStepsStream() async* {
-    // 0. Sync with Health storage (to pick up watch steps)
-    await syncWithHealth();
+  Future<void> _handleDateChange(String oldDate, String newDate, int steps) async {
+    await _storeStepInHistory(oldDate, steps);
 
-    // 1. Initialize from cache
+    try {
+      DateTime oldDT = _parseDate(oldDate);
+      DateTime newDT = _parseDate(newDate);
+      int daysGap = newDT.difference(oldDT).inDays;
+
+      if (daysGap > 1) {
+        for (int i = 1; i < daysGap; i++) {
+          final gapDate = oldDT.add(Duration(days: i));
+          final gapDateStr = "${gapDate.year}-${gapDate.month}-${gapDate.day}";
+          await _storeStepInHistory(gapDateStr, 0);
+        }
+      }
+    } catch (e) {
+      debugPrint('StepService: Error filling history gaps: $e');
+    }
+  }
+
+  Stream<int> getTodayStepsStream() async* {
     int todaySteps = prefs.getInt('today_steps') ?? 0;
-    int lastSensorTotal = prefs.getInt('last_sensor_total') ?? 0;
+    int lastSensorTotal = prefs.getInt('last_sensor_total') ?? -1;
     String lastSavedDate = prefs.getString('last_saved_date') ?? _currentDate();
 
     final now = _currentDate();
     if (lastSavedDate != now) {
-      // If we haven't opened the app since yesterday, flush yesterday's steps
-      await _storeStepInHistory(lastSavedDate, todaySteps);
-
+      await _handleDateChange(lastSavedDate, now, todaySteps);
       todaySteps = 0;
       lastSavedDate = now;
+      lastSensorTotal = -1;
+      
       await prefs.setInt('today_steps', 0);
       await prefs.setString('last_saved_date', lastSavedDate);
+      await prefs.setInt('last_sensor_total', -1);
     }
 
     yield todaySteps;
 
-    // 2. Listen for real-time sensor updates
-    await for (final sensorTotal in _rawStepStream()) {
-      // Skip applying step delta while in vehicle/bike; still track lastSensorTotal
-      if (_isInVehicle) {
-        lastSensorTotal = sensorTotal;
-        continue;
-      }
+    // Debouncing persistence to avoid excessive disk I/O
+    DateTime lastPersistTime = DateTime.now();
+    int lastPersistedSteps = todaySteps;
 
+    await for (final sensorTotal in _rawStepStream()) {
       final currentDay = _currentDate();
 
       if (currentDay != lastSavedDate) {
-        // Daylight transition happened while app is open
-        await _storeStepInHistory(lastSavedDate, todaySteps);
+        await _handleDateChange(lastSavedDate, currentDay, todaySteps);
         todaySteps = 0;
         lastSavedDate = currentDay;
         lastSensorTotal = sensorTotal;
       } else {
-        if (lastSensorTotal == 0) {
+        if (lastSensorTotal <= 0) {
           lastSensorTotal = sensorTotal;
         } else {
           int delta = sensorTotal - lastSensorTotal;
           if (delta > 0) {
-            todaySteps += delta;
+            if (!_isInVehicle) {
+              todaySteps += delta;
+            }
           } else if (delta < 0) {
-            // Sensor reset (e.g. reboot)
             todaySteps += sensorTotal;
           }
           lastSensorTotal = sensorTotal;
         }
       }
 
-      // 3. Persist
-      await prefs.setInt('today_steps', todaySteps);
-      await prefs.setInt('last_sensor_total', lastSensorTotal);
-      await prefs.setString('last_saved_date', lastSavedDate);
+      // Persist only if steps changed significantly or enough time has passed
+      final nowTime = DateTime.now();
+      if (todaySteps != lastPersistedSteps && 
+          (todaySteps - lastPersistedSteps >= 10 || 
+           nowTime.difference(lastPersistTime).inSeconds >= 15)) {
+        
+        await prefs.setInt('today_steps', todaySteps);
+        await prefs.setInt('last_sensor_total', lastSensorTotal);
+        await prefs.setString('last_saved_date', lastSavedDate);
+        
+        lastPersistedSteps = todaySteps;
+        lastPersistTime = nowTime;
+      }
 
       yield todaySteps;
     }
@@ -196,5 +182,9 @@ class StepService {
 
   Future<void> saveGoal(int goal) async {
     await prefs.setInt('daily_goal', goal);
+  }
+
+  void stop() {
+    _motionDetection.stop();
   }
 }

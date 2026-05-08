@@ -1,13 +1,9 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 /// Lightweight motion classifier using accelerometer + gyroscope to detect
 /// vehicle / bicycle states without Google Play Services or location.
-/// Heuristic: sustained low-variance linear acceleration with occasional spikes
-/// and low step cadence hints vehicle; medium variance with periodic lateral
-/// oscillation suggests bicycle; anything else is treated as on-foot.
 class MotionDetectionService {
   static const _windowSize = 50; // samples per window (at ~50Hz -> ~1s)
   static const _vehicleVarThreshold = 0.6; // m/s^2 variance
@@ -19,67 +15,86 @@ class MotionDetectionService {
       StreamController<bool>.broadcast();
   Stream<bool> get isInVehicleStream => _isInVehicleController.stream;
 
-  final List<double> _accMagWindow = [];
-  final List<double> _gyroMagWindow = [];
+  // Use fixed-length lists as circular buffers for O(1) insertion
+  final List<double> _accMagWindow = List.filled(_windowSize, 0.0);
+  final List<double> _gyroMagWindow = List.filled(_windowSize, 0.0);
+  int _accIndex = 0;
+  int _gyroIndex = 0;
+  int _accCount = 0;
+  int _gyroCount = 0;
 
   StreamSubscription<AccelerometerEvent>? _accSub;
   StreamSubscription<GyroscopeEvent>? _gyroSub;
 
   bool _isVehicle = false;
+  DateTime _lastEvaluation = DateTime.now();
 
   void start() {
-    // Sensors_plus streams run on best effort; no permission required.
     _accSub = accelerometerEventStream().listen(_onAcc);
     _gyroSub = gyroscopeEventStream().listen(_onGyro);
   }
 
   void _onAcc(AccelerometerEvent e) {
-    final mag = _magnitude(e.x, e.y, e.z) - 9.81; // remove gravity approx
-    _accMagWindow.add(mag.abs());
-    _trimWindows();
+    final mag = _magnitude(e.x, e.y, e.z) - 9.81;
+    _accMagWindow[_accIndex] = mag.abs();
+    _accIndex = (_accIndex + 1) % _windowSize;
+    if (_accCount < _windowSize) _accCount++;
     _evaluate();
   }
 
   void _onGyro(GyroscopeEvent e) {
     final mag = _magnitude(e.x, e.y, e.z);
-    _gyroMagWindow.add(mag.abs());
-    _trimWindows();
+    _gyroMagWindow[_gyroIndex] = mag.abs();
+    _gyroIndex = (_gyroIndex + 1) % _windowSize;
+    if (_gyroCount < _windowSize) _gyroCount++;
     _evaluate();
   }
 
-  void _trimWindows() {
-    if (_accMagWindow.length > _windowSize) {
-      _accMagWindow.removeAt(0);
-    }
-    if (_gyroMagWindow.length > _windowSize) {
-      _gyroMagWindow.removeAt(0);
-    }
-  }
-
   void _evaluate() {
-    if (_accMagWindow.length < _windowSize || _gyroMagWindow.length < 10) {
-      return; // not enough data yet
+    // Throttling: only evaluate at most 5 times per second (200ms)
+    final now = DateTime.now();
+    if (now.difference(_lastEvaluation).inMilliseconds < 200) {
+      return;
+    }
+    
+    if (_accCount < _windowSize || _gyroCount < 10) {
+      return;
     }
 
-    final accVar = _variance(_accMagWindow);
-    final maxAcc = _accMagWindow.reduce(max);
-    final gyroMean = _gyroMagWindow.reduce((a, b) => a + b) /
-        _gyroMagWindow.length;
+    _lastEvaluation = now;
 
-    bool vehicleLike = accVar < _vehicleVarThreshold && maxAcc < _vehicleSpikeThreshold;
-    bool bikeLike = accVar >= _bikeVarMin && accVar <= _bikeVarMax && gyroMean > 0.4;
+    // Direct iteration is efficient for small windows (N=50)
+    double accSum = 0;
+    double maxAcc = 0;
+    for (int i = 0; i < _accCount; i++) {
+      final v = _accMagWindow[i];
+      accSum += v;
+      if (v > maxAcc) maxAcc = v;
+    }
+    final accMean = accSum / _accCount;
+    
+    double accVarSum = 0;
+    for (int i = 0; i < _accCount; i++) {
+      accVarSum += pow(_accMagWindow[i] - accMean, 2);
+    }
+    final accVar = accVarSum / _accCount;
+
+    double gyroSum = 0;
+    for (int i = 0; i < _gyroCount; i++) {
+      gyroSum += _gyroMagWindow[i];
+    }
+    final gyroMean = gyroSum / _gyroCount;
+
+    bool vehicleLike =
+        accVar < _vehicleVarThreshold && maxAcc < _vehicleSpikeThreshold;
+    bool bikeLike =
+        accVar >= _bikeVarMin && accVar <= _bikeVarMax && gyroMean > 0.4;
 
     final newState = vehicleLike || bikeLike;
     if (newState != _isVehicle) {
       _isVehicle = newState;
       _isInVehicleController.add(_isVehicle);
     }
-  }
-
-  double _variance(List<double> values) {
-    final mean = values.reduce((a, b) => a + b) / values.length;
-    final sumSq = values.fold<double>(0, (s, v) => s + pow(v - mean, 2));
-    return sumSq / values.length;
   }
 
   double _magnitude(double x, double y, double z) =>
@@ -90,6 +105,8 @@ class MotionDetectionService {
     _gyroSub?.cancel();
     _accSub = null;
     _gyroSub = null;
+    _accCount = 0;
+    _gyroCount = 0;
   }
 
   void dispose() {

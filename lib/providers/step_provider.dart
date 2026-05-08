@@ -12,6 +12,7 @@ class StepProvider with ChangeNotifier {
   bool _isPermissionGranted = true;
   bool _isBatteryOptimizationIgnored = true;
   StreamSubscription<int>? _subscription;
+  StreamSubscription? _backgroundSubscription;
 
   StepProvider(this._service);
 
@@ -105,28 +106,29 @@ class StepProvider with ChangeNotifier {
 
   void _startStepStream() {
     _subscription?.cancel();
+    _backgroundSubscription?.cancel();
 
-    // Listen to real-time step count from the main app's StepService
+    // 1. Listen to real-time step count from the main app's StepService
     _subscription = _service.getTodayStepsStream().listen((steps) {
       _todaySteps = steps;
       notifyListeners();
 
-      // Broadcast steps to background service so notification stays updated
+      // Broadcast steps to background service if it needs manual updates
       final service = FlutterBackgroundService();
       service.invoke('steps_update', {'steps': steps, 'goal': _goal});
     });
-  }
 
-  Future<void> syncWithHealth() async {
-    await _service.syncWithHealth();
-    // After syncing, we can optionally refresh history too
-    _history = await _service.getHistoricalSteps(14);
-
-    // Broadcast updated steps to background service
-    final service = FlutterBackgroundService();
-    service.invoke('steps_update', {'steps': _todaySteps, 'goal': _goal});
-
-    notifyListeners();
+    // 2. Also listen for updates FROM the background service
+    // This ensures UI stays in sync even if the main stream has issues
+    _backgroundSubscription = FlutterBackgroundService().on('steps_updated_in_background').listen((event) {
+      if (event != null) {
+        final steps = event['steps'] as int? ?? _todaySteps;
+        if (steps != _todaySteps) {
+          _todaySteps = steps;
+          notifyListeners();
+        }
+      }
+    });
   }
 
   Future<void> updateGoal(int newGoal) async {
@@ -143,6 +145,7 @@ class StepProvider with ChangeNotifier {
   @override
   void dispose() {
     _subscription?.cancel();
+    _backgroundSubscription?.cancel();
     super.dispose();
   }
 }
