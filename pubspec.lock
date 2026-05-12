@@ -81,6 +81,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.1"
+  fl_chart:
+    dependency: "direct main"
+    description:
+      name: fl_chart
+      sha256: f2e9137f261d0f53a820f6b829c80ba570ac915284c8e32789d973834796eca0
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.71.0"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -487,4 +495,4 @@ packages:
     version: "1.1.0"
 sdks:
   dart: ">=3.10.4 <4.0.0"
-  flutter: ">=3.38.5 <4.0.0"
+  flutter: ">=3.41.7 <4.0.0"

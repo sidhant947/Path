@@ -20,7 +20,7 @@ version: 1.0.6+7
 
 environment:
   sdk: ^3.10.4
-  flutter: ^3.38.5
+  flutter: ^3.41.9
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -43,6 +43,7 @@ dependencies:
   equatable: ^2.0.8
   provider: ^6.1.2
   flutter_background_service: ^5.1.0
+  fl_chart: ^0.71.0
 
 dev_dependencies:
   flutter_test:

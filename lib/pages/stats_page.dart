@@ -1,8 +1,8 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../utils/date_formatter.dart';
 import '../utils/step_service.dart';
@@ -65,10 +65,7 @@ class _StatsPageState extends State<StatsPage> {
                       if (todaySteps > 0)
                         _buildEncouragementMessage(todaySteps, goal, isDark),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        height: 300,
-                        child: _buildProgressRings(chartRecords, goal),
-                      ),
+                      _buildBarChart(chartRecords, goal),
                       const SizedBox(height: 24),
                       ...displayRecords.map(
                         (item) => _buildListItem(item, context),
@@ -206,74 +203,168 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildProgressRings(List<DailyStepRecord> records, int goal) {
+  Widget _buildBarChart(List<DailyStepRecord> records, int goal) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (records.isEmpty) {
       return _buildEmptyChartPlaceholder(isDark);
     }
 
+    double maxY = goal.toDouble();
+    for (var record in records) {
+      if (record.steps > maxY) maxY = record.steps.toDouble();
+    }
+    // Add 20% headroom
+    maxY = maxY * 1.2;
+
     return Container(
       height: 300,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
       decoration: BoxDecoration(
         color: isDark ? Colors.grey[900] : Colors.grey[100],
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: _ConcentricRingsPainter(
-                records: records,
-                goal: goal.toDouble(),
-                isDark: isDark,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 16,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLegendItem('Today', const Color(0xFFC7F900), isDark),
-                const SizedBox(width: 16),
-                _buildLegendItem(
-                  'Past 7 Days',
-                  const Color(0xFFC7F900).withValues(alpha: 0.4),
-                  isDark,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'ACTIVITY',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: Colors.grey,
                 ),
-              ],
+              ),
+              Text(
+                'Goal: ${_numberFormat.format(goal)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                maxY: maxY,
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor:
+                        (group) => isDark ? Colors.grey[800]! : Colors.white,
+                    tooltipBorder:
+                        isDark ? null : BorderSide(color: Colors.grey[300]!),
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        _numberFormat.format(rod.toY.toInt()),
+                        TextStyle(
+                          color: isDark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= records.length) {
+                          return const SizedBox();
+                        }
+                        final date = records[index].date;
+                        final isToday =
+                            DateFormat('yyyy-MM-dd').format(date) ==
+                            DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            isToday ? 'T' : DateFormat('E').format(date)[0],
+                            style: TextStyle(
+                              color: isDark ? Colors.white54 : Colors.black54,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      },
+                      reservedSize: 30,
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                gridData: const FlGridData(show: false),
+                barGroups:
+                    records.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final record = entry.value;
+                      final isToday =
+                          DateFormat('yyyy-MM-dd').format(record.date) ==
+                          DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+                      return BarChartGroupData(
+                        x: index,
+                        barRods: [
+                          BarChartRodData(
+                            toY: record.steps.toDouble(),
+                            color:
+                                isToday
+                                    ? const Color(0xFFC7F900)
+                                    : const Color(0xFFC7F900).withValues(
+                                      alpha: 0.4,
+                                    ),
+                            width: 22,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(6),
+                              topRight: Radius.circular(6),
+                            ),
+                            backDrawRodData: BackgroundBarChartRodData(
+                              show: true,
+                              toY: maxY,
+                              color:
+                                  isDark
+                                      ? Colors.white.withValues(alpha: 0.05)
+                                      : Colors.black.withValues(alpha: 0.05),
+                            ),
+                          ),
+                        ],
+                        showingTooltipIndicators: [],
+                      );
+                    }).toList(),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    HorizontalLine(
+                      y: goal.toDouble(),
+                      color: const Color(0xFFC7F900).withValues(alpha: 0.3),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLegendItem(String label, Color color, bool isDark) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white54 : Colors.black54,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
     );
   }
 
@@ -350,95 +441,4 @@ class _StatsPageState extends State<StatsPage> {
       ),
     );
   }
-}
-
-class _ConcentricRingsPainter extends CustomPainter {
-  final List<DailyStepRecord> records;
-  final double goal;
-  final bool isDark;
-
-  _ConcentricRingsPainter({
-    required this.records,
-    required this.goal,
-    required this.isDark,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = (size.width < size.height ? size.width : size.height) / 2;
-
-    final ringWidth = maxRadius / (records.length + 1.5);
-    final spacing = 4.0;
-
-    for (int i = 0; i < records.length; i++) {
-      final record =
-          records[records.length - 1 - i]; // Outer to inner (Today to past)
-      final progress = (record.steps / goal).clamp(
-        0.0,
-        1.5,
-      ); // Allow slight overflow visual
-
-      final radius = maxRadius - (i * (ringWidth + spacing));
-
-      // Color: Outer is bright lime, inner rings are progressively more transparent/darker
-      final opacity = 1.0 - (i * 0.12);
-      final color = const Color(0xFFC7F900).withValues(
-        alpha: opacity.clamp(0.2, 1.0),
-      );
-
-      final backgroundPaint = Paint()
-        ..color = isDark
-            ? Colors.white.withValues(alpha: 0.05)
-            : Colors.black.withValues(alpha: 0.05)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = ringWidth
-        ..strokeCap = StrokeCap.round;
-
-      final progressPaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = ringWidth
-        ..strokeCap = StrokeCap.round;
-
-      // Draw background track
-      canvas.drawCircle(center, radius, backgroundPaint);
-
-      // Draw progress arc
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        -3.14159 / 2, // Start from top
-        progress * 2 * 3.14159,
-        false,
-        progressPaint,
-      );
-
-      // Add a small day label if it's the outermost or every few rings
-      if (i == 0 || i == records.length - 1) {
-        final textPainter = TextPainter(
-          text: TextSpan(
-            text: i == 0 ? 'T' : '7d',
-            style: TextStyle(
-              color: isDark ? Colors.white38 : Colors.black38,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          textDirection: ui.TextDirection.ltr,
-        );
-        textPainter.layout();
-        textPainter.paint(
-          canvas,
-          Offset(
-            center.dx - textPainter.width / 2,
-            center.dy - radius - textPainter.height / 2,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ConcentricRingsPainter oldDelegate) =>
-      !listEquals(oldDelegate.records, records) || oldDelegate.goal != goal;
 }
