@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 
@@ -25,8 +26,17 @@ class StepService {
   /// Whether motion pattern suggests vehicle/bicycle
   bool _isInVehicle = false;
 
+  /// Active Activity classification
+  ActivityType _currentActivity = ActivityType.stationary;
+
+  /// Battery saver power throttling fields
+  Timer? _throttleTimer;
+  bool _isMotionServiceRunning = true;
+
   StepService(this.prefs, {MotionDetectionService? motionDetection})
     : _motionDetection = motionDetection ?? MotionDetectionService() {
+    final sensitivity = prefs.getString('motion_sensitivity') ?? 'medium';
+    _motionDetection.setSensitivity(sensitivity);
     _initMotionDetection();
   }
 
@@ -34,7 +44,24 @@ class StepService {
     _motionDetection.isInVehicleStream.listen((inVehicle) {
       _isInVehicle = inVehicle;
     });
-    _motionDetection.start();
+    _motionDetection.activityTypeStream.listen((activity) {
+      _currentActivity = activity;
+    });
+    _resetThrottleTimer();
+  }
+
+  void _resetThrottleTimer() {
+    _throttleTimer?.cancel();
+    if (!_isMotionServiceRunning) {
+      _motionDetection.start();
+      _isMotionServiceRunning = true;
+      debugPrint("StepService: Waking up motion detection sensors.");
+    }
+    _throttleTimer = Timer(const Duration(minutes: 2), () {
+      _motionDetection.stop();
+      _isMotionServiceRunning = false;
+      debugPrint("StepService: Throttling motion detection sensors to save battery.");
+    });
   }
 
   String _currentDate() {
@@ -100,6 +127,42 @@ class StepService {
       debugPrint('StepService: Error filling history gaps: $e');
     }
   }
+  void _recordStepDelta(int delta, int currentTodaySteps) async {
+    _resetThrottleTimer(); // Reset battery saver throttling timer when steps are recorded
+
+    // 1. Walking vs Running
+    int walkingSteps = prefs.getInt('today_walking_steps') ?? 0;
+    int runningSteps = prefs.getInt('today_running_steps') ?? 0;
+    if (_currentActivity == ActivityType.running) {
+      runningSteps += delta;
+      await prefs.setInt('today_running_steps', runningSteps);
+    } else {
+      walkingSteps += delta;
+      await prefs.setInt('today_walking_steps', walkingSteps);
+    }
+
+    // 2. Hourly Steps Map
+    final currentHour = DateTime.now().hour.toString();
+    final hourlyString = prefs.getString('today_hourly_steps') ?? '{}';
+    Map<String, dynamic> hourlyMap = {};
+    try {
+      hourlyMap = jsonDecode(hourlyString);
+    } catch (_) {}
+    hourlyMap[currentHour] = (hourlyMap[currentHour] ?? 0) + delta;
+    await prefs.setString('today_hourly_steps', jsonEncode(hourlyMap));
+
+    // 3. Lifetime steps
+    int lifetime = prefs.getInt('lifetime_steps') ?? 0;
+    lifetime += delta;
+    await prefs.setInt('lifetime_steps', lifetime);
+
+    // 4. Personal Best (Compare today steps with PB steps)
+    int pbSteps = prefs.getInt('pb_steps') ?? 0;
+    if (currentTodaySteps > pbSteps) {
+      await prefs.setInt('pb_steps', currentTodaySteps);
+      await prefs.setString('pb_steps_date', _currentDate());
+    }
+  }
 
   Stream<int> getTodayStepsStream() async* {
     int todaySteps = prefs.getInt('today_steps') ?? 0;
@@ -116,6 +179,11 @@ class StepService {
       await prefs.setInt('today_steps', 0);
       await prefs.setString('last_saved_date', lastSavedDate);
       await prefs.setInt('last_sensor_total', -1);
+
+      // Reset daily counts for the new day
+      await prefs.setInt('today_walking_steps', 0);
+      await prefs.setInt('today_running_steps', 0);
+      await prefs.setString('today_hourly_steps', '{}');
     }
 
     yield todaySteps;
@@ -132,6 +200,12 @@ class StepService {
         todaySteps = 0;
         lastSavedDate = currentDay;
         lastSensorTotal = sensorTotal;
+
+        // Reset daily counts for the new day
+        await prefs.setInt('today_steps', 0);
+        await prefs.setInt('today_walking_steps', 0);
+        await prefs.setInt('today_running_steps', 0);
+        await prefs.setString('today_hourly_steps', '{}');
       } else {
         if (lastSensorTotal <= 0) {
           lastSensorTotal = sensorTotal;
@@ -140,9 +214,13 @@ class StepService {
           if (delta > 0) {
             if (!_isInVehicle) {
               todaySteps += delta;
+              _recordStepDelta(delta, todaySteps);
             }
           } else if (delta < 0) {
-            todaySteps += sensorTotal;
+            if (!_isInVehicle) {
+              todaySteps += sensorTotal;
+              _recordStepDelta(sensorTotal, todaySteps);
+            }
           }
           lastSensorTotal = sensorTotal;
         }
@@ -193,7 +271,13 @@ class StepService {
     await prefs.setInt('daily_goal', goal);
   }
 
+  void updateSensitivity(String sensitivity) {
+    _motionDetection.setSensitivity(sensitivity);
+  }
+
   void stop() {
+    _throttleTimer?.cancel();
     _motionDetection.stop();
   }
 }
+

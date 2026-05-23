@@ -56,6 +56,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final stepProvider = context.watch<StepProvider>();
+
     return MaterialApp(
       title: 'Step Tracker',
       debugShowCheckedModeBanner: false,
@@ -69,7 +71,7 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.dark,
         fontFamily: 'Space Grotesk',
       ),
-      themeMode: ThemeMode.system,
+      themeMode: stepProvider.themeMode,
       home: hasCompletedOnboarding
           ? (initialGoal == null
                 ? GoalSetupPage(repository: repository)

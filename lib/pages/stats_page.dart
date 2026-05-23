@@ -1,5 +1,5 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -32,6 +32,7 @@ class _StatsPageState extends State<StatsPage> {
     final history = stepProvider.history;
     final goal = stepProvider.goal;
     final streak = stepProvider.streak;
+    final accentColor = stepProvider.accentColor;
 
     // Combine today with history for display
     final todayRecord = DailyStepRecord(
@@ -54,21 +55,28 @@ class _StatsPageState extends State<StatsPage> {
             child: SafeArea(
               bottom: false,
               child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 16),
-                      _buildStreakBar(streak),
+                      _buildStreakBar(streak, accentColor),
                       const SizedBox(height: 24),
                       if (todaySteps > 0)
-                        _buildEncouragementMessage(todaySteps, goal, isDark),
+                        _buildEncouragementMessage(todaySteps, goal, isDark, accentColor),
                       const SizedBox(height: 16),
-                      _buildBarChart(chartRecords, goal),
+                      _buildBarChart(chartRecords, goal, isDark, accentColor),
+                      const SizedBox(height: 24),
+                      _buildWalkRunBreakdown(stepProvider, isDark, accentColor),
+                      const SizedBox(height: 24),
+                      _buildHourlyChart(stepProvider, isDark, accentColor),
+                      const SizedBox(height: 24),
+                      _buildAchievementsSection(stepProvider, isDark, accentColor),
                       const SizedBox(height: 24),
                       ...displayRecords.map(
-                        (item) => _buildListItem(item, context),
+                        (item) => _buildListItem(item, context, accentColor),
                       ),
                       const SizedBox(height: 80), // Space for nav
                     ],
@@ -83,7 +91,7 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildStreakBar(int streak) {
+  Widget _buildStreakBar(int streak, Color accentColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -106,7 +114,7 @@ class _StatsPageState extends State<StatsPage> {
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: active
-                      ? const Color(0xFFC7F900)
+                      ? accentColor
                       : Colors.grey.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(3),
                 ),
@@ -123,7 +131,7 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildEncouragementMessage(int steps, int goal, bool isDark) {
+  Widget _buildEncouragementMessage(int steps, int goal, bool isDark, Color accentColor) {
     String message = "Go for a walk! You can do it.";
     if (steps >= goal) {
       message = "Amazing work! Goal smashed.";
@@ -139,7 +147,7 @@ class _StatsPageState extends State<StatsPage> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.directions_walk, color: Color(0xFFC7F900)),
+          Icon(Icons.directions_walk, color: accentColor),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -203,9 +211,7 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildBarChart(List<DailyStepRecord> records, int goal) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+  Widget _buildBarChart(List<DailyStepRecord> records, int goal, bool isDark, Color accentColor) {
     if (records.isEmpty) {
       return _buildEmptyChartPlaceholder(isDark);
     }
@@ -328,8 +334,8 @@ class _StatsPageState extends State<StatsPage> {
                             toY: record.steps.toDouble(),
                             color:
                                 isToday
-                                    ? const Color(0xFFC7F900)
-                                    : const Color(0xFFC7F900).withValues(
+                                    ? accentColor
+                                    : accentColor.withValues(
                                       alpha: 0.4,
                                     ),
                             width: 22,
@@ -354,7 +360,7 @@ class _StatsPageState extends State<StatsPage> {
                   horizontalLines: [
                     HorizontalLine(
                       y: goal.toDouble(),
-                      color: const Color(0xFFC7F900).withValues(alpha: 0.3),
+                      color: accentColor.withValues(alpha: 0.3),
                       strokeWidth: 1,
                       dashArray: [5, 5],
                     ),
@@ -392,11 +398,302 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildListItem(DailyStepRecord record, BuildContext context) {
+  Widget _buildWalkRunBreakdown(StepProvider provider, bool isDark, Color accentColor) {
+    final walk = provider.walkingSteps;
+    final run = provider.runningSteps;
+    final total = walk + run;
+    final double walkPercent = total > 0 ? (walk / total) : 1.0;
+    final double runPercent = total > 0 ? (run / total) : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'TODAY BREAKDOWN',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Row(
+              children: [
+                if (walkPercent > 0)
+                  Expanded(
+                    flex: (walkPercent * 100).toInt().clamp(1, 100),
+                    child: Container(
+                      height: 8,
+                      color: accentColor,
+                    ),
+                  ),
+                if (runPercent > 0)
+                  Expanded(
+                    flex: (runPercent * 100).toInt().clamp(1, 100),
+                    child: Container(
+                      height: 8,
+                      color: Colors.orange,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.directions_walk_rounded, color: accentColor, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Walk: ${_numberFormat.format(walk)} (${(walkPercent * 100).toStringAsFixed(0)}%)',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.directions_run_rounded, color: Colors.orange, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Run: ${_numberFormat.format(run)} (${(runPercent * 100).toStringAsFixed(0)}%)',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHourlyChart(StepProvider provider, bool isDark, Color accentColor) {
+    Map<String, dynamic> hourlyMap = {};
+    try {
+      hourlyMap = jsonDecode(provider.hourlyStepsString);
+    } catch (_) {}
+
+    int night = 0;
+    int morning = 0;
+    int afternoon = 0;
+    int evening = 0;
+
+    hourlyMap.forEach((key, val) {
+      final hour = int.tryParse(key) ?? 0;
+      final steps = val as int? ?? 0;
+      if (hour >= 0 && hour < 6) {
+        night += steps;
+      } else if (hour >= 6 && hour < 12) {
+        morning += steps;
+      } else if (hour >= 12 && hour < 18) {
+        afternoon += steps;
+      } else {
+        evening += steps;
+      }
+    });
+
+    final maxSteps = [night, morning, afternoon, evening].reduce((a, b) => a > b ? a : b);
+
+    double getBarHeight(int steps) {
+      if (maxSteps == 0) return 10.0;
+      return (steps / maxSteps * 100.0).clamp(10.0, 100.0);
+    }
+
+    Widget buildBar(String label, int steps, IconData icon) {
+      return Expanded(
+        child: Column(
+          children: [
+            Text(
+              _numberFormat.format(steps),
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              height: 100,
+              width: 14,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[800] : Colors.grey[300],
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  Container(
+                    height: getBarHeight(steps),
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Icon(icon, size: 16, color: Colors.grey),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'HOURLY DISTRIBUTION',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              buildBar('NIGHT', night, Icons.nights_stay_rounded),
+              buildBar('MORNING', morning, Icons.wb_sunny_rounded),
+              buildBar('AFTERNOON', afternoon, Icons.wb_twilight_rounded),
+              buildBar('EVENING', evening, Icons.dark_mode_rounded),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAchievementsSection(StepProvider provider, bool isDark, Color accentColor) {
+    final pbSteps = provider.pbSteps;
+    final pbStepsDate = provider.pbStepsDate;
+    final pbStreak = provider.pbStreak;
+    final lifetime = provider.lifetimeSteps;
+
+    Widget buildAchCard(String label, String value, String sub, IconData icon, Color col) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[950] : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? Colors.grey[850]! : Colors.grey[200]!, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: col, size: 24),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+              ),
+              if (sub.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  sub,
+                  style: TextStyle(fontSize: 8, color: Colors.grey[500]),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PERSONAL RECORDS & BADGES',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              buildAchCard(
+                'ALL-TIME BEST',
+                _numberFormat.format(pbSteps),
+                pbStepsDate,
+                Icons.emoji_events_rounded,
+                Colors.amber,
+              ),
+              const SizedBox(width: 8),
+              buildAchCard(
+                'BEST STREAK',
+                '$pbStreak DAYS',
+                'Active Days',
+                Icons.local_fire_department_rounded,
+                Colors.orange,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              buildAchCard(
+                'LIFETIME STEPS',
+                _numberFormat.format(lifetime),
+                '',
+                Icons.stacked_line_chart_rounded,
+                accentColor,
+              ),
+              const SizedBox(width: 8),
+              buildAchCard(
+                'TOTAL DISTANCE',
+                '${provider.getDistanceKmForSteps(lifetime).toStringAsFixed(1)} km',
+                '',
+                Icons.map_rounded,
+                Colors.blue,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListItem(DailyStepRecord record, BuildContext context, Color accentColor) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryTextColor = isDark ? Colors.white : Colors.black;
     final secondaryTextColor = Colors.grey;
-    final accentTextColor = const Color(0xFF32CD32);
 
     final isToday =
         DateFormat('yyyy-MM-dd').format(record.date) ==
@@ -432,7 +729,7 @@ class _StatsPageState extends State<StatsPage> {
           Text(
             _numberFormat.format(record.steps),
             style: TextStyle(
-              color: accentTextColor,
+              color: accentColor,
               fontSize: 22,
               fontWeight: FontWeight.w600,
             ),

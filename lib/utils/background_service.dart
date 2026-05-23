@@ -37,6 +37,19 @@ Future<bool> onIosBackground(ServiceInstance service) async {
   return true;
 }
 
+int _getCurrentGoal(SharedPreferences prefs) {
+  final flexibleEnabled = prefs.getBool('flexible_goals_enabled') ?? false;
+  if (flexibleEnabled) {
+    final day = DateTime.now().weekday;
+    if (day == DateTime.saturday || day == DateTime.sunday) {
+      return prefs.getInt('goal_weekend') ?? 6000;
+    } else {
+      return prefs.getInt('goal_weekday') ?? 10000;
+    }
+  }
+  return prefs.getInt('daily_goal') ?? 10000;
+}
+
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   try {
@@ -45,7 +58,7 @@ void onStart(ServiceInstance service) async {
     final stepService = StepService(prefs);
 
     // Read initial values
-    int goal = prefs.getInt('daily_goal') ?? 10000;
+    int goal = _getCurrentGoal(prefs);
     int currentSteps = prefs.getInt('today_steps') ?? 0;
 
     // Show initial notification immediately
@@ -76,9 +89,11 @@ void onStart(ServiceInstance service) async {
 
     // Periodically refresh notification to keep it visible
     int lastDay = DateTime.now().day;
-    final refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    final refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
       if (DateTime.now().day != lastDay) {
         lastDay = DateTime.now().day;
+        await prefs.reload();
+        goal = _getCurrentGoal(prefs); // Recalculate goal on day change
         startTracking(); // Re-trigger StepService to handle date change and reset to 0
       } else {
         _updateNotification(service, currentSteps, goal);
@@ -95,13 +110,16 @@ void onStart(ServiceInstance service) async {
     });
 
     // Listen for step updates broadcasted from the main app (e.g. goal changes)
-    updateSubscription = service.on('steps_update').listen((event) {
+    updateSubscription = service.on('steps_update').listen((event) async {
+      await prefs.reload();
       final data = event;
       final newGoal = data?['goal'] as int?;
       if (newGoal != null) {
         goal = newGoal;
-        debugPrint("Background service: Goal updated to $goal");
+      } else {
+        goal = _getCurrentGoal(prefs);
       }
+      debugPrint("Background service: Goal updated to $goal");
 
       _updateNotification(service, currentSteps, goal);
     });
