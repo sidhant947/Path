@@ -40,213 +40,181 @@ class _TodayPageState extends State<TodayPage> {
 
   @override
   Widget build(BuildContext context) {
-    final stepProvider = context.watch<StepProvider>();
-    final int steps = stepProvider.todaySteps;
-    final int goal = stepProvider.goal;
-
+    final accentColor = context.select<StepProvider, Color>((p) => p.accentColor);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDark ? Colors.black : Colors.white;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final limeColor = stepProvider.accentColor;
-
-    final double percentage = (steps / goal).clamp(0.0, 1.0);
 
     return Scaffold(
       backgroundColor: backgroundColor,
       body: Stack(
         children: [
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 700),
-              curve: Curves.easeOutCubic,
-              height: MediaQuery.of(context).size.height * percentage,
-              width: double.infinity,
-              color: limeColor,
-            ),
-          ),
+          _buildBackgroundFill(accentColor),
           RepaintBoundary(
-            child: _buildForeground(
+            child: _buildForegroundLayer(
               context,
-              textColor: textColor,
-              steps: steps,
-              goal: goal,
-              stepProvider: stepProvider,
+              textColor: isDark ? Colors.white : Colors.black,
             ),
           ),
-          ClipRect(
-            clipper: _BottomFillClipper(percentage),
-            child: RepaintBoundary(
-              child: _buildForeground(
-                context,
-                textColor: Colors.black,
-                steps: steps,
-                goal: goal,
-                stepProvider: stepProvider,
-              ),
-            ),
-          ),
+          _buildClippedForegroundLayer(context),
         ],
       ),
     );
   }
 
-  Widget _buildForeground(
-    BuildContext context, {
-    required Color textColor,
-    required int steps,
-    required int goal,
-    required StepProvider stepProvider,
-  }) {
-    final String formattedGoal = _formatNumber(goal);
-    final String formattedSteps = _formatNumber(steps);
-    final remainingData = getFormattedRemaining(steps, goal);
+  Widget _buildBackgroundFill(Color accentColor) {
+    return Selector<StepProvider, double>(
+      selector: (_, p) => (p.todaySteps / p.goal).clamp(0.0, 1.0),
+      builder: (context, percentage, _) {
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 700),
+            curve: Curves.easeOutCubic,
+            height: MediaQuery.of(context).size.height * percentage,
+            width: double.infinity,
+            color: accentColor,
+          ),
+        );
+      },
+    );
+  }
 
-    return Column(
-      children: [
-        Expanded(
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: 24.0,
-                right: 24.0,
-                top: 32.0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  GoalSetupPage(repository: widget.repository),
-                            ),
-                          );
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'GOAL',
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            Text(
-                              formattedGoal,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                remainingData['label']!,
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              Text(
-                                remainingData['value']!,
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 12),
-                          IconButton(
-                            icon: Icon(Icons.settings_rounded, color: textColor),
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const SettingsPage()),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Column(
-                    children: [
-                      Text(
-                        formattedSteps,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 88,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -2.0,
-                          height: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Daily Steps',
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 36),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildMetricItem(
-                            icon: Icons.straighten_rounded,
-                            value: '${stepProvider.todayDistanceKm.toStringAsFixed(2)} km',
-                            label: 'DISTANCE',
-                            color: textColor,
-                          ),
-                          _buildMetricItem(
-                            icon: Icons.local_fire_department_rounded,
-                            value: '${stepProvider.todayCalories.toStringAsFixed(0)} kcal',
-                            label: 'CALORIES',
-                            color: textColor,
-                          ),
-                          _buildMetricItem(
-                            icon: Icons.timer_rounded,
-                            value: '${stepProvider.todayActiveMinutes.toStringAsFixed(0)}m',
-                            label: 'ACTIVE',
-                            color: textColor,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                ],
-              ),
+  Widget _buildClippedForegroundLayer(BuildContext context) {
+    return Selector<StepProvider, double>(
+      selector: (_, p) => (p.todaySteps / p.goal).clamp(0.0, 1.0),
+      builder: (context, percentage, _) {
+        return ClipRect(
+          clipper: _BottomFillClipper(percentage),
+          child: RepaintBoundary(
+            child: _buildForegroundLayer(
+              context,
+              textColor: Colors.black,
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildForegroundLayer(BuildContext context, {required Color textColor}) {
+    return Selector<StepProvider, (int, int)>(
+      selector: (_, p) => (p.todaySteps, p.goal),
+      builder: (context, data, _) {
+        final steps = data.$1;
+        final goal = data.$2;
+        final formattedGoal = _formatNumber(goal);
+        final formattedSteps = _formatNumber(steps);
+        final remainingData = getFormattedRemaining(steps, goal);
+
+        return Column(
+          children: [
+            Expanded(
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 32.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(context, textColor, formattedGoal, remainingData),
+                      const Spacer(),
+                      _buildMainCounter(textColor, formattedSteps),
+                      const SizedBox(height: 36),
+                      _buildMetricsRow(textColor),
+                      const Spacer(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            _buildBottomNav(context, textColor: textColor),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, Color textColor, String formattedGoal, Map<String, String> remainingData) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => GoalSetupPage(repository: widget.repository),
+              ),
+            );
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('GOAL', style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              Text(formattedGoal, style: TextStyle(color: textColor, fontSize: 26, fontWeight: FontWeight.bold)),
+            ],
+          ),
         ),
-        _buildBottomNav(context, textColor: textColor),
+        Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(remainingData['label']!, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                Text(remainingData['value']!, style: TextStyle(color: textColor, fontSize: 26, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(width: 12),
+            IconButton(
+              icon: Icon(Icons.settings_rounded, color: textColor),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+              },
+            ),
+          ],
+        ),
       ],
+    );
+  }
+
+  Widget _buildMainCounter(Color textColor, String formattedSteps) {
+    return Column(
+      children: [
+        Text(formattedSteps, style: TextStyle(color: textColor, fontSize: 88, fontWeight: FontWeight.w800, letterSpacing: -2.0, height: 1.0)),
+        const SizedBox(height: 8),
+        Text('Daily Steps', style: TextStyle(color: textColor, fontSize: 22, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _buildMetricsRow(Color textColor) {
+    return Consumer<StepProvider>(
+      builder: (context, provider, _) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildMetricItem(
+              icon: Icons.straighten_rounded,
+              value: '${provider.todayDistanceKm.toStringAsFixed(2)} km',
+              label: 'DISTANCE',
+              color: textColor,
+            ),
+            _buildMetricItem(
+              icon: Icons.local_fire_department_rounded,
+              value: '${provider.todayCalories.toStringAsFixed(0)} kcal',
+              label: 'CALORIES',
+              color: textColor,
+            ),
+            _buildMetricItem(
+              icon: Icons.timer_rounded,
+              value: '${provider.todayActiveMinutes.toStringAsFixed(0)}m',
+              label: 'ACTIVE',
+              color: textColor,
+            ),
+          ],
+        );
+      },
     );
   }
 

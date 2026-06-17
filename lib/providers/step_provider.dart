@@ -11,9 +11,7 @@ class StepProvider with ChangeNotifier {
   int _goal = 10000;
   bool _isPermissionGranted = true;
   bool _isBatteryOptimizationIgnored = true;
-  StreamSubscription<int>? _subscription;
   StreamSubscription? _backgroundSubscription;
-  DateTime _lastBackgroundUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
   // Profile settings
   double _height = 170.0;
@@ -32,9 +30,47 @@ class StepProvider with ChangeNotifier {
   // Sensitivity settings
   String _motionSensitivity = 'medium';
 
-  StepProvider(this._service);
+  // Cached achievement & tracking metrics
+  int _walkingSteps = 0;
+  int _runningSteps = 0;
+  int _lifetimeSteps = 0;
+  int _pbSteps = 0;
+  String _pbStepsDate = '';
+  int _pbStreak = 0;
+  String _hourlyStepsString = '{}';
 
-  /// Must be called after the widget is built (e.g., via addPostFrameCallback)
+  StepProvider(this._service) {
+    _loadInitialData();
+  }
+
+  void _loadInitialData() {
+    final prefs = _service.prefs;
+    _todaySteps = prefs.getInt('today_steps') ?? 0;
+    _goal = prefs.getInt('daily_goal') ?? 10000;
+    _history = _service.getHistoricalStepsSync(14);
+
+    _height = prefs.getDouble('height') ?? 170.0;
+    _weight = prefs.getDouble('weight') ?? 70.0;
+    _gender = prefs.getString('gender') ?? 'Other';
+
+    _flexibleGoalsEnabled = prefs.getBool('flexible_goals_enabled') ?? false;
+    _goalWeekday = prefs.getInt('goal_weekday') ?? 10000;
+    _goalWeekend = prefs.getInt('goal_weekend') ?? 6000;
+
+    _themeModeName = prefs.getString('theme_mode') ?? 'system';
+    _accentColorName = prefs.getString('accent_color') ?? 'Lime';
+    _motionSensitivity = prefs.getString('motion_sensitivity') ?? 'medium';
+
+    _walkingSteps = prefs.getInt('today_walking_steps') ?? 0;
+    _runningSteps = prefs.getInt('today_running_steps') ?? 0;
+    _lifetimeSteps = prefs.getInt('lifetime_steps') ?? 0;
+    _pbSteps = prefs.getInt('pb_steps') ?? 0;
+    _pbStepsDate = prefs.getString('pb_steps_date') ?? '';
+    _pbStreak = prefs.getInt('pb_streak') ?? 0;
+    _hourlyStepsString = prefs.getString('today_hourly_steps') ?? '{}';
+  }
+
+  /// Must be called after the widget is built
   Future<void> init() async {
     await _init();
   }
@@ -43,6 +79,14 @@ class StepProvider with ChangeNotifier {
     final prefs = _service.prefs;
     await prefs.reload();
 
+    final int newSteps = prefs.getInt('today_steps') ?? 0;
+    
+    // Only update if it's a significant jump or it's lower (potential reset/new day)
+    // If the difference is small, we trust the real-time _todaySteps from the event
+    if (newSteps > _todaySteps || (newSteps == 0 && _todaySteps > 10)) {
+      _todaySteps = newSteps;
+    }
+    
     _goal = await _service.getGoal() ?? 10000;
     _history = await _service.getHistoricalSteps(14);
 
@@ -57,6 +101,14 @@ class StepProvider with ChangeNotifier {
     _themeModeName = prefs.getString('theme_mode') ?? 'system';
     _accentColorName = prefs.getString('accent_color') ?? 'Lime';
     _motionSensitivity = prefs.getString('motion_sensitivity') ?? 'medium';
+
+    _walkingSteps = prefs.getInt('today_walking_steps') ?? 0;
+    _runningSteps = prefs.getInt('today_running_steps') ?? 0;
+    _lifetimeSteps = prefs.getInt('lifetime_steps') ?? 0;
+    _pbSteps = prefs.getInt('pb_steps') ?? 0;
+    _pbStepsDate = prefs.getString('pb_steps_date') ?? '';
+    _pbStreak = prefs.getInt('pb_streak') ?? 0;
+    _hourlyStepsString = prefs.getString('today_hourly_steps') ?? '{}';
 
     _checkAndSaveStreakPB();
     notifyListeners();
@@ -120,12 +172,12 @@ class StepProvider with ChangeNotifier {
   }
 
   // Getters for achievements & tracking metrics
-  int get walkingSteps => _service.prefs.getInt('today_walking_steps') ?? 0;
-  int get runningSteps => _service.prefs.getInt('today_running_steps') ?? 0;
-  int get lifetimeSteps => _service.prefs.getInt('lifetime_steps') ?? 0;
-  int get pbSteps => _service.prefs.getInt('pb_steps') ?? 0;
-  String get pbStepsDate => _service.prefs.getString('pb_steps_date') ?? '';
-  int get pbStreak => _service.prefs.getInt('pb_streak') ?? 0;
+  int get walkingSteps => _walkingSteps;
+  int get runningSteps => _runningSteps;
+  int get lifetimeSteps => _lifetimeSteps;
+  int get pbSteps => _pbSteps;
+  String get pbStepsDate => _pbStepsDate;
+  int get pbStreak => _pbStreak;
 
   // Estimator Getters
   double getDistanceKmForSteps(int stepsCount) {
@@ -151,39 +203,34 @@ class StepProvider with ChangeNotifier {
   double get todayActiveMinutes => _todaySteps / 100.0;
 
   // Getters for hourly breakdown
-  String get hourlyStepsString => _service.prefs.getString('today_hourly_steps') ?? '{}';
+  String get hourlyStepsString => _hourlyStepsString;
 
   int get streak {
-    int currentStreak = 0;
-
-    // Check if user was active today (at least 1 step)
-    if (_todaySteps > 0) {
-      currentStreak = 1;
-    }
+    int currentStreak = _todaySteps > 0 ? 1 : 0;
 
     if (_history.isEmpty) return currentStreak;
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    DateTime dayToLookFor = today.subtract(const Duration(days: 1));
 
     // Look back through history
-    for (int i = 0; i < _history.length; i++) {
-      final record = _history[i];
+    for (var record in _history) {
       final recordDate = DateTime(
         record.date.year,
         record.date.month,
         record.date.day,
       );
 
-      // Expected date for the current streak count
-      final expectedDate = today.subtract(Duration(days: currentStreak));
-
-      // If user was active on this day, increment streak
-      if (recordDate == expectedDate && record.steps > 0) {
-        currentStreak++;
-      } else if (recordDate.isBefore(expectedDate)) {
-        // We found a gap in the streak
-        break;
+      if (recordDate == dayToLookFor) {
+        if (record.steps > 0) {
+          currentStreak++;
+          dayToLookFor = dayToLookFor.subtract(const Duration(days: 1));
+        } else {
+          break; // Gap in activity
+        }
+      } else if (recordDate.isBefore(dayToLookFor)) {
+        break; // Gap in data
       }
     }
 
@@ -259,28 +306,7 @@ class StepProvider with ChangeNotifier {
   }
 
   Future<void> _init() async {
-    final prefs = _service.prefs;
-
-    _goal = await _service.getGoal() ?? 10000;
-    _history = await _service.getHistoricalSteps(14); // Fetch more for safety
-
-    // Load profile
-    _height = prefs.getDouble('height') ?? 170.0;
-    _weight = prefs.getDouble('weight') ?? 70.0;
-    _gender = prefs.getString('gender') ?? 'Other';
-
-    // Load flexible goals
-    _flexibleGoalsEnabled = prefs.getBool('flexible_goals_enabled') ?? false;
-    _goalWeekday = prefs.getInt('goal_weekday') ?? 10000;
-    _goalWeekend = prefs.getInt('goal_weekend') ?? 6000;
-
-    // Load theme
-    _themeModeName = prefs.getString('theme_mode') ?? 'system';
-    _accentColorName = prefs.getString('accent_color') ?? 'Lime';
-
-    // Load sensitivity
-    _motionSensitivity = prefs.getString('motion_sensitivity') ?? 'medium';
-
+    // We already loaded data in constructor, but let's refresh permission statuses
     final activityStatus = await Permission.activityRecognition.status;
     _isPermissionGranted = activityStatus.isGranted;
 
@@ -288,8 +314,6 @@ class StepProvider with ChangeNotifier {
     _isBatteryOptimizationIgnored = batteryStatus.isGranted;
 
     _checkAndSaveStreakPB();
-
-    // Always start stream, StepService now handles waiting for permission
     _startStepStream();
   }
 
@@ -302,34 +326,32 @@ class StepProvider with ChangeNotifier {
   }
 
   void _startStepStream() {
-    _subscription?.cancel();
     _backgroundSubscription?.cancel();
 
-    // 1. Listen to real-time step count from the main app's StepService
-    _subscription = _service.getTodayStepsStream().listen((steps) {
-      // Prioritize background service steps if it's active
-      if (DateTime.now().difference(_lastBackgroundUpdate).inSeconds > 5) {
-        if (_todaySteps != steps) {
-          _todaySteps = steps;
-          _checkAndSaveStreakPB();
-          notifyListeners();
-        }
-      }
+    _todaySteps = _service.prefs.getInt('today_steps') ?? 0;
 
-      // Broadcast steps to background service if it needs manual updates
-      final service = FlutterBackgroundService();
-      service.invoke('steps_update', {'steps': steps, 'goal': goal});
-    });
-
-    // 2. Also listen for updates FROM the background service
-    // This ensures UI stays in sync even if the main stream has issues
-    _backgroundSubscription = FlutterBackgroundService().on('steps_updated_in_background').listen((event) {
+    _backgroundSubscription = FlutterBackgroundService().on('steps_updated_in_background').listen((event) async {
       if (event != null) {
-        _lastBackgroundUpdate = DateTime.now();
         final steps = event['steps'] as int? ?? _todaySteps;
+        
+        // Reload prefs to get latest walking/running/hourly steps and PB
+        final prefs = _service.prefs;
+        await prefs.reload();
+        
+        // Update cached values
+        _walkingSteps = prefs.getInt('today_walking_steps') ?? 0;
+        _runningSteps = prefs.getInt('today_running_steps') ?? 0;
+        _lifetimeSteps = prefs.getInt('lifetime_steps') ?? 0;
+        _pbSteps = prefs.getInt('pb_steps') ?? 0;
+        _pbStepsDate = prefs.getString('pb_steps_date') ?? '';
+        _pbStreak = prefs.getInt('pb_streak') ?? 0;
+        _hourlyStepsString = prefs.getString('today_hourly_steps') ?? '{}';
+        
         if (steps != _todaySteps) {
           _todaySteps = steps;
           _checkAndSaveStreakPB();
+          notifyListeners();
+        } else {
           notifyListeners();
         }
       }
@@ -353,7 +375,6 @@ class StepProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    _subscription?.cancel();
     _backgroundSubscription?.cancel();
     super.dispose();
   }

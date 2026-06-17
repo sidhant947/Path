@@ -56,6 +56,7 @@ void onStart(ServiceInstance service) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload(); // Ensure we have latest data across isolates
     final stepService = StepService(prefs);
+    stepService.startMotionDetection();
 
     // Read initial values
     int goal = _getCurrentGoal(prefs);
@@ -73,16 +74,25 @@ void onStart(ServiceInstance service) async {
 
     void startTracking() {
       stepSubscription?.cancel();
-      stepSubscription = stepService.getTodayStepsStream().listen((steps) {
-        currentSteps = steps;
-        _updateNotification(service, currentSteps, goal);
-        
-        // Notify main app if it's running
-        service.invoke('steps_updated_in_background', {
-          'steps': currentSteps,
-          'goal': goal,
-        });
-      });
+      stepSubscription = stepService.getTodayStepsStream().listen(
+        (steps) {
+          currentSteps = steps;
+          _updateNotification(service, currentSteps, goal);
+
+          service.invoke('steps_updated_in_background', {
+            'steps': currentSteps,
+            'goal': goal,
+          });
+        },
+        onError: (error) {
+          debugPrint("Background service: Step stream error: $error");
+          Future.delayed(const Duration(seconds: 5), () => startTracking());
+        },
+        onDone: () {
+          debugPrint("Background service: Step stream closed, restarting...");
+          Future.delayed(const Duration(seconds: 3), () => startTracking());
+        },
+      );
     }
 
     startTracking();
@@ -96,6 +106,8 @@ void onStart(ServiceInstance service) async {
         goal = _getCurrentGoal(prefs); // Recalculate goal on day change
         startTracking(); // Re-trigger StepService to handle date change and reset to 0
       } else {
+        await prefs.reload();
+        goal = _getCurrentGoal(prefs);
         _updateNotification(service, currentSteps, goal);
       }
     });

@@ -27,24 +27,7 @@ class _StatsPageState extends State<StatsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final stepProvider = context.watch<StepProvider>();
-    final todaySteps = stepProvider.todaySteps;
-    final history = stepProvider.history;
-    final goal = stepProvider.goal;
-    final streak = stepProvider.streak;
-    final accentColor = stepProvider.accentColor;
-
-    // Combine today with history for display
-    final todayRecord = DailyStepRecord(
-      date: DateTime.now(),
-      steps: todaySteps,
-    );
-    final allRecords = [todayRecord, ...history];
-
-    // Sort and take last 7 days including today
-    final displayRecords = allRecords.take(7).toList();
-    final chartRecords = displayRecords.reversed.toList();
-
+    final accentColor = context.select<StepProvider, Color>((p) => p.accentColor);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -62,23 +45,23 @@ class _StatsPageState extends State<StatsPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 16),
-                      _buildStreakBar(streak, accentColor),
+                      _buildStreakSection(accentColor),
                       const SizedBox(height: 24),
-                      if (todaySteps > 0)
-                        _buildEncouragementMessage(todaySteps, goal, isDark, accentColor),
+                      _buildEncouragementSection(isDark, accentColor),
                       const SizedBox(height: 16),
-                      _buildBarChart(chartRecords, goal, isDark, accentColor),
+                      _buildActivityChartSection(isDark, accentColor),
                       const SizedBox(height: 24),
-                      _buildWalkRunBreakdown(stepProvider, isDark, accentColor),
+                      _buildBreakdownSection(isDark, accentColor),
                       const SizedBox(height: 24),
-                      _buildHourlyChart(stepProvider, isDark, accentColor),
+                      _buildHourlySection(isDark, accentColor),
                       const SizedBox(height: 24),
-                      _buildAchievementsSection(stepProvider, isDark, accentColor),
-                      const SizedBox(height: 24),
-                      ...displayRecords.map(
-                        (item) => _buildListItem(item, context, accentColor),
+                      Consumer<StepProvider>(
+                        builder: (context, provider, _) => _buildAchievementsSection(provider, isDark, accentColor),
                       ),
-                      const SizedBox(height: 80), // Space for nav
+                      const SizedBox(height: 24),
+                      _buildHistoryList(accentColor),
+
+                      const SizedBox(height: 80),
                     ],
                   ),
                 ),
@@ -88,6 +71,59 @@ class _StatsPageState extends State<StatsPage> {
           _buildBottomNav(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildStreakSection(Color accentColor) {
+    return Selector<StepProvider, int>(
+      selector: (_, p) => p.streak,
+      builder: (context, streak, _) => _buildStreakBar(streak, accentColor),
+    );
+  }
+
+  Widget _buildEncouragementSection(bool isDark, Color accentColor) {
+    return Selector<StepProvider, (int, int)>(
+      selector: (_, p) => (p.todaySteps, p.goal),
+      builder: (context, data, _) => _buildEncouragementMessage(data.$1, data.$2, isDark, accentColor),
+    );
+  }
+
+  Widget _buildActivityChartSection(bool isDark, Color accentColor) {
+    return Selector<StepProvider, (int, int, List<DailyStepRecord>)>(
+      selector: (_, p) => (p.todaySteps, p.goal, p.history),
+      builder: (context, data, _) {
+        final todayRecord = DailyStepRecord(date: DateTime.now(), steps: data.$1);
+        final allRecords = [todayRecord, ...data.$3];
+        final displayRecords = allRecords.take(7).toList();
+        final chartRecords = displayRecords.reversed.toList();
+        return _buildBarChart(chartRecords, data.$2, isDark, accentColor);
+      },
+    );
+  }
+
+  Widget _buildBreakdownSection(bool isDark, Color accentColor) {
+    return Consumer<StepProvider>(
+      builder: (context, provider, _) => _buildWalkRunBreakdown(provider, isDark, accentColor),
+    );
+  }
+
+  Widget _buildHourlySection(bool isDark, Color accentColor) {
+    return Selector<StepProvider, String>(
+      selector: (_, p) => p.hourlyStepsString,
+      builder: (context, hourlyString, _) => _buildHourlyChart(hourlyString, isDark, accentColor),
+    );
+  }
+
+  Widget _buildHistoryList(Color accentColor) {
+    return Selector<StepProvider, (int, List<DailyStepRecord>)>(
+      selector: (_, p) => (p.todaySteps, p.history),
+      builder: (context, data, _) {
+        final todayRecord = DailyStepRecord(date: DateTime.now(), steps: data.$1);
+        final displayRecords = [todayRecord, ...data.$2].take(7).toList();
+        return Column(
+          children: displayRecords.map((item) => _buildListItem(item, context, accentColor)).toList(),
+        );
+      },
     );
   }
 
@@ -478,10 +514,10 @@ class _StatsPageState extends State<StatsPage> {
     );
   }
 
-  Widget _buildHourlyChart(StepProvider provider, bool isDark, Color accentColor) {
+  Widget _buildHourlyChart(String hourlyStepsString, bool isDark, Color accentColor) {
     Map<String, dynamic> hourlyMap = {};
     try {
-      hourlyMap = jsonDecode(provider.hourlyStepsString);
+      hourlyMap = jsonDecode(hourlyStepsString);
     } catch (_) {}
 
     int night = 0;

@@ -297,7 +297,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       Switch(
                         value: _flexibleGoals,
-                        activeColor: accentColor,
+                        activeThumbColor: accentColor,
                         onChanged: (val) {
                           setState(() => _flexibleGoals = val);
                           _saveGoals();

@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 import 'utils/step_service.dart';
-import 'utils/background_service.dart';
 import 'pages/goal_setup_page.dart';
 import 'pages/main_page.dart';
 import 'pages/welcome_page.dart';
@@ -13,33 +12,27 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final prefs = await SharedPreferences.getInstance();
+  await prefs.reload(); // Critical for cross-isolate sync on startup
 
   final repository = StepService(prefs);
-  final goal = await repository.getGoal();
   final hasCompletedOnboarding = prefs.getBool('onboarding_complete') ?? false;
 
-  // Initialize background service only if onboarding is complete
-  if (hasCompletedOnboarding) {
-    await initializeService();
-  }
-
   final stepProvider = StepProvider(repository);
+  
+  // Kick off async init (permissions, stream) without awaiting
+  // so the UI can render immediately with the sync data from constructor
+  stepProvider.init();
 
   runApp(
     ChangeNotifierProvider<StepProvider>.value(
       value: stepProvider,
       child: MyApp(
-        initialGoal: goal,
+        initialGoal: prefs.getInt('daily_goal'),
         repository: repository,
         hasCompletedOnboarding: hasCompletedOnboarding,
       ),
     ),
   );
-
-  // Initialize provider after first frame is built
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    stepProvider.init();
-  });
 }
 
 class MyApp extends StatelessWidget {
@@ -56,7 +49,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stepProvider = context.watch<StepProvider>();
+    final themeMode = context.select<StepProvider, ThemeMode>((p) => p.themeMode);
 
     return MaterialApp(
       title: 'Step Tracker',
@@ -71,7 +64,7 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.dark,
         fontFamily: 'Space Grotesk',
       ),
-      themeMode: stepProvider.themeMode,
+      themeMode: themeMode,
       home: hasCompletedOnboarding
           ? (initialGoal == null
                 ? GoalSetupPage(repository: repository)

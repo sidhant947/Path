@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import 'package:pedometer/pedometer.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:equatable/equatable.dart';
 import 'motion_detection_service.dart';
@@ -37,6 +39,9 @@ class StepService {
     : _motionDetection = motionDetection ?? MotionDetectionService() {
     final sensitivity = prefs.getString('motion_sensitivity') ?? 'medium';
     _motionDetection.setSensitivity(sensitivity);
+  }
+
+  void startMotionDetection() {
     _initMotionDetection();
   }
 
@@ -77,16 +82,67 @@ class StepService {
   Stream<int> _rawStepStream() async* {
     if (Platform.isLinux) return;
 
+    int pedometerFailCount = 0;
+
     while (true) {
-      if (await Permission.activityRecognition.isGranted) {
-        try {
-          yield* Pedometer.stepCountStream.map((event) => event.steps);
-        } catch (e) {
-          debugPrint('StepService: Pedometer stream error: $e');
+      try {
+        if (await Permission.activityRecognition.isGranted) {
+          if (pedometerFailCount < 3) {
+            try {
+              await for (final entry in Pedometer.stepCountStream) {
+                pedometerFailCount = 0;
+                yield entry.steps;
+              }
+            } catch (e) {
+              pedometerFailCount++;
+              debugPrint('StepService: Pedometer error ($pedometerFailCount/3): $e');
+            }
+            if (pedometerFailCount < 3) {
+              await Future.delayed(const Duration(seconds: 5));
+              continue;
+            }
+          }
+
+          // Fallback to accelerometer
+          debugPrint('StepService: Using accelerometer fallback');
+          int accTotal = 0;
+          await for (final delta in _accelerometerStepStream()) {
+            accTotal += delta;
+            // We yield a value that looks like a sensor total
+            // When switching back to pedometer, getTodayStepsStream will handle the "reset"
+            yield accTotal;
+          }
+          pedometerFailCount = 0;
+        }
+      } catch (e) {
+        debugPrint('StepService: _rawStepStream error: $e');
+      }
+      await Future.delayed(const Duration(seconds: 5));
+    }
+  }
+
+  Stream<int> _accelerometerStepStream() async* {
+    bool wasAboveThreshold = false;
+    const double threshold = 11.5;
+    const Duration cooldown = Duration(milliseconds: 350);
+    DateTime lastStepTime = DateTime.fromMillisecondsSinceEpoch(0);
+    final startTime = DateTime.now();
+
+    await for (final event in accelerometerEventStream()) {
+      // Periodic check back for hardware pedometer
+      if (DateTime.now().difference(startTime).inMinutes >= 5) break;
+
+      final mag = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+      final above = mag > threshold;
+
+      if (above && !wasAboveThreshold) {
+        final now = DateTime.now();
+        if (now.difference(lastStepTime) > cooldown) {
+          lastStepTime = now;
+          yield 1; // Yield a delta of 1 step
         }
       }
-      // Wait before checking again if stream closed or permission not granted
-      await Future.delayed(const Duration(seconds: 5));
+      wasAboveThreshold = above;
     }
   }
 
@@ -127,8 +183,10 @@ class StepService {
       debugPrint('StepService: Error filling history gaps: $e');
     }
   }
+  Map<String, int>? _hourlyCache;
+
   void _recordStepDelta(int delta, int currentTodaySteps) async {
-    _resetThrottleTimer(); // Reset battery saver throttling timer when steps are recorded
+    _resetThrottleTimer();
 
     // 1. Walking vs Running
     int walkingSteps = prefs.getInt('today_walking_steps') ?? 0;
@@ -141,15 +199,20 @@ class StepService {
       await prefs.setInt('today_walking_steps', walkingSteps);
     }
 
-    // 2. Hourly Steps Map
+    // 2. Hourly Steps Map - Optimized with Cache
     final currentHour = DateTime.now().hour.toString();
-    final hourlyString = prefs.getString('today_hourly_steps') ?? '{}';
-    Map<String, dynamic> hourlyMap = {};
-    try {
-      hourlyMap = jsonDecode(hourlyString);
-    } catch (_) {}
-    hourlyMap[currentHour] = (hourlyMap[currentHour] ?? 0) + delta;
-    await prefs.setString('today_hourly_steps', jsonEncode(hourlyMap));
+    if (_hourlyCache == null) {
+      final hourlyString = prefs.getString('today_hourly_steps') ?? '{}';
+      try {
+        final Map<String, dynamic> decoded = jsonDecode(hourlyString);
+        _hourlyCache = decoded.map((key, value) => MapEntry(key, value as int));
+      } catch (_) {
+        _hourlyCache = {};
+      }
+    }
+    
+    _hourlyCache![currentHour] = (_hourlyCache![currentHour] ?? 0) + delta;
+    await prefs.setString('today_hourly_steps', jsonEncode(_hourlyCache));
 
     // 3. Lifetime steps
     int lifetime = prefs.getInt('lifetime_steps') ?? 0;
@@ -188,8 +251,6 @@ class StepService {
 
     yield todaySteps;
 
-    // Debouncing persistence to avoid excessive disk I/O
-    DateTime lastPersistTime = DateTime.now();
     int lastPersistedSteps = todaySteps;
 
     await for (final sensorTotal in _rawStepStream()) {
@@ -209,42 +270,41 @@ class StepService {
       } else {
         if (lastSensorTotal <= 0) {
           lastSensorTotal = sensorTotal;
-        } else {
+        } else if (sensorTotal > lastSensorTotal) {
           int delta = sensorTotal - lastSensorTotal;
-          if (delta > 0) {
-            if (!_isInVehicle) {
-              todaySteps += delta;
-              _recordStepDelta(delta, todaySteps);
-            }
-          } else if (delta < 0) {
+          if (!_isInVehicle) {
+            todaySteps += delta;
+            _recordStepDelta(delta, todaySteps);
+          }
+          lastSensorTotal = sensorTotal;
+        } else if (sensorTotal < lastSensorTotal) {
+          // Significant drop suggests a reboot or reset of the pedometer
+          // Only process if it looks like a real reset (near zero or large drop)
+          if (sensorTotal < 100 || sensorTotal < lastSensorTotal / 2) {
             if (!_isInVehicle) {
               todaySteps += sensorTotal;
               _recordStepDelta(sensorTotal, todaySteps);
             }
+            lastSensorTotal = sensorTotal;
           }
-          lastSensorTotal = sensorTotal;
+          // Minor dips are ignored as noise
         }
       }
 
-      // Persist only if steps changed significantly or enough time has passed
-      final nowTime = DateTime.now();
-      if (todaySteps != lastPersistedSteps && 
-          (todaySteps - lastPersistedSteps >= 10 || 
-           nowTime.difference(lastPersistTime).inSeconds >= 15)) {
-        
+      // Persist immediately on every step to keep isolates in sync
+      if (todaySteps != lastPersistedSteps) {
         await prefs.setInt('today_steps', todaySteps);
         await prefs.setInt('last_sensor_total', lastSensorTotal);
         await prefs.setString('last_saved_date', lastSavedDate);
         
         lastPersistedSteps = todaySteps;
-        lastPersistTime = nowTime;
       }
 
       yield todaySteps;
     }
   }
 
-  Future<List<DailyStepRecord>> getHistoricalSteps(int days) async {
+  List<DailyStepRecord> getHistoricalStepsSync(int days) {
     final history = prefs.getStringList('step_history') ?? [];
     return history
         .map((item) {
@@ -261,6 +321,10 @@ class StepService {
         })
         .take(days)
         .toList();
+  }
+
+  Future<List<DailyStepRecord>> getHistoricalSteps(int days) async {
+    return getHistoricalStepsSync(days);
   }
 
   Future<int?> getGoal() async {

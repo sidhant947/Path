@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'goal_setup_page.dart';
 import '../utils/step_service.dart';
+import '../utils/background_service.dart';
 
 class OnboardingPage extends StatefulWidget {
   final StepService repository;
@@ -97,6 +98,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
   void _goToGoalSetup() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_complete', true);
+    
+    // Start tracking immediately
+    await initializeService();
 
     if (mounted) {
       Navigator.of(context).pushReplacement(

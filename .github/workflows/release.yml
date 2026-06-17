@@ -7,6 +7,10 @@ on:
         description: 'Version tag (e.g. v1.0.0)'
         required: true
         default: 'v1.0.0'
+      flutter_version:
+        description: 'Flutter version'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -28,10 +32,18 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ github.event.inputs.flutter_version }}
+          flutter-version-file: ${{ github.event.inputs.flutter_version == '' && 'pubspec.yaml' || '' }}
           channel: 'stable'
+          cache: true
+
+      - name: Print Flutter Version
+        run: flutter --version
 
       - name: Get Dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          sed -i -e 's/-Wl,/-Wl,--build-id=none,/' ${PUB_CACHE}/hosted/*/jni-*/src/CMakeLists.txt
 
       - name: Setup Keystore
         run: |
