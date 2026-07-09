@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/step_service.dart';
+import '../utils/step_store_file.dart';
 
 class StepProvider with ChangeNotifier {
   final StepService _service;
@@ -12,6 +14,7 @@ class StepProvider with ChangeNotifier {
   bool _isPermissionGranted = true;
   bool _isBatteryOptimizationIgnored = true;
   StreamSubscription? _backgroundSubscription;
+  Timer? _pollTimer;
 
   // Profile settings
   double _height = 170.0;
@@ -80,13 +83,13 @@ class StepProvider with ChangeNotifier {
     await prefs.reload();
 
     final int newSteps = prefs.getInt('today_steps') ?? 0;
-    
+
     // Only update if it's a significant jump or it's lower (potential reset/new day)
     // If the difference is small, we trust the real-time _todaySteps from the event
     if (newSteps > _todaySteps || (newSteps == 0 && _todaySteps > 10)) {
       _todaySteps = newSteps;
     }
-    
+
     _goal = await _service.getGoal() ?? 10000;
     _history = await _service.getHistoricalSteps(14);
 
@@ -116,7 +119,7 @@ class StepProvider with ChangeNotifier {
 
   int get todaySteps => _todaySteps;
   List<DailyStepRecord> get history => _history;
-  
+
   bool get isPermissionGranted => _isPermissionGranted;
   bool get isBatteryOptimizationIgnored => _isBatteryOptimizationIgnored;
 
@@ -238,7 +241,11 @@ class StepProvider with ChangeNotifier {
   }
 
   // Setters/Updaters
-  Future<void> updateProfile(double height, double weight, String gender) async {
+  Future<void> updateProfile(
+    double height,
+    double weight,
+    String gender,
+  ) async {
     _height = height;
     _weight = weight;
     _gender = gender;
@@ -315,6 +322,7 @@ class StepProvider with ChangeNotifier {
 
     _checkAndSaveStreakPB();
     _startStepStream();
+    _startPolling();
   }
 
   void _checkAndSaveStreakPB() async {
@@ -325,37 +333,93 @@ class StepProvider with ChangeNotifier {
     }
   }
 
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      final data = await StepStoreFile.load();
+      final storedSteps = data['today_steps'] as int? ?? 0;
+      if (storedSteps != _todaySteps) {
+        _todaySteps = storedSteps;
+        _walkingSteps = data['today_walking_steps'] as int? ?? 0;
+        _runningSteps = data['today_running_steps'] as int? ?? 0;
+        _lifetimeSteps = data['lifetime_steps'] as int? ?? 0;
+        _pbSteps = data['pb_steps'] as int? ?? 0;
+        _pbStepsDate = data['pb_steps_date'] as String? ?? '';
+        _pbStreak = data['pb_streak'] as int? ?? 0;
+        _hourlyStepsString = data['today_hourly_steps'] as String? ?? '{}';
+        _checkAndSaveStreakPB();
+        notifyListeners();
+      }
+    });
+  }
+
+  /// Request immediate sync from background service and refresh from step store file
+  Future<void> requestSync() async {
+    // Restart the background service to ensure its Dart isolate is alive.
+    // The native Service can outlive its Dart isolate; restarting forces a
+    // fresh isolate that will reconnect the sensor and write to the file.
+    final service = FlutterBackgroundService();
+    try {
+      if (await service.isRunning()) {
+        service.invoke('stopService');
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    } catch (_) {}
+    try {
+      await service.startService();
+    } catch (_) {}
+    // Request immediate sync in case the isolate was already alive
+    service.invoke('sync_request');
+
+    final data = await StepStoreFile.load();
+    final storedSteps = data['today_steps'] as int? ?? 0;
+    if (storedSteps != _todaySteps) {
+      _todaySteps = storedSteps;
+    }
+    _walkingSteps = data['today_walking_steps'] as int? ?? 0;
+    _runningSteps = data['today_running_steps'] as int? ?? 0;
+    _lifetimeSteps = data['lifetime_steps'] as int? ?? 0;
+    _pbSteps = data['pb_steps'] as int? ?? 0;
+    _pbStepsDate = data['pb_steps_date'] as String? ?? '';
+    _pbStreak = data['pb_streak'] as int? ?? 0;
+    _hourlyStepsString = data['today_hourly_steps'] as String? ?? '{}';
+    _checkAndSaveStreakPB();
+    notifyListeners();
+  }
+
   void _startStepStream() {
     _backgroundSubscription?.cancel();
 
     _todaySteps = _service.prefs.getInt('today_steps') ?? 0;
 
-    _backgroundSubscription = FlutterBackgroundService().on('steps_updated_in_background').listen((event) async {
-      if (event != null) {
-        final steps = event['steps'] as int? ?? _todaySteps;
-        
-        // Reload prefs to get latest walking/running/hourly steps and PB
-        final prefs = _service.prefs;
-        await prefs.reload();
-        
-        // Update cached values
-        _walkingSteps = prefs.getInt('today_walking_steps') ?? 0;
-        _runningSteps = prefs.getInt('today_running_steps') ?? 0;
-        _lifetimeSteps = prefs.getInt('lifetime_steps') ?? 0;
-        _pbSteps = prefs.getInt('pb_steps') ?? 0;
-        _pbStepsDate = prefs.getString('pb_steps_date') ?? '';
-        _pbStreak = prefs.getInt('pb_streak') ?? 0;
-        _hourlyStepsString = prefs.getString('today_hourly_steps') ?? '{}';
-        
-        if (steps != _todaySteps) {
-          _todaySteps = steps;
-          _checkAndSaveStreakPB();
-          notifyListeners();
-        } else {
-          notifyListeners();
-        }
-      }
-    });
+    _backgroundSubscription = FlutterBackgroundService()
+        .on('steps_updated_in_background')
+        .listen((event) async {
+          if (event != null) {
+            final steps = event['steps'] as int? ?? _todaySteps;
+
+            // Reload prefs to get latest walking/running/hourly steps and PB
+            final prefs = _service.prefs;
+            await prefs.reload();
+
+            // Update cached values
+            _walkingSteps = prefs.getInt('today_walking_steps') ?? 0;
+            _runningSteps = prefs.getInt('today_running_steps') ?? 0;
+            _lifetimeSteps = prefs.getInt('lifetime_steps') ?? 0;
+            _pbSteps = prefs.getInt('pb_steps') ?? 0;
+            _pbStepsDate = prefs.getString('pb_steps_date') ?? '';
+            _pbStreak = prefs.getInt('pb_streak') ?? 0;
+            _hourlyStepsString = prefs.getString('today_hourly_steps') ?? '{}';
+
+            if (steps != _todaySteps) {
+              _todaySteps = steps;
+              _checkAndSaveStreakPB();
+              notifyListeners();
+            } else {
+              notifyListeners();
+            }
+          }
+        });
   }
 
   Future<void> updateGoal(int newGoal) async {
@@ -376,7 +440,7 @@ class StepProvider with ChangeNotifier {
   @override
   void dispose() {
     _backgroundSubscription?.cancel();
+    _pollTimer?.cancel();
     super.dispose();
   }
 }
-

@@ -18,7 +18,7 @@ void main() async {
   final hasCompletedOnboarding = prefs.getBool('onboarding_complete') ?? false;
 
   final stepProvider = StepProvider(repository);
-  
+
   // Kick off async init (permissions, stream) without awaiting
   // so the UI can render immediately with the sync data from constructor
   stepProvider.init();
@@ -35,6 +35,39 @@ void main() async {
   );
 }
 
+class _AppLifecycleWatcher extends StatefulWidget {
+  final Widget child;
+  const _AppLifecycleWatcher({required this.child});
+
+  @override
+  State<_AppLifecycleWatcher> createState() => _AppLifecycleWatcherState();
+}
+
+class _AppLifecycleWatcherState extends State<_AppLifecycleWatcher>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<StepProvider>().requestSync();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class MyApp extends StatelessWidget {
   final int? initialGoal;
   final StepService repository;
@@ -49,27 +82,31 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = context.select<StepProvider, ThemeMode>((p) => p.themeMode);
+    final themeMode = context.select<StepProvider, ThemeMode>(
+      (p) => p.themeMode,
+    );
 
-    return MaterialApp(
-      title: 'Step Tracker',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white,
-        brightness: Brightness.light,
-        fontFamily: 'Space Grotesk',
+    return _AppLifecycleWatcher(
+      child: MaterialApp(
+        title: 'Step Tracker',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          scaffoldBackgroundColor: Colors.white,
+          brightness: Brightness.light,
+          fontFamily: 'Space Grotesk',
+        ),
+        darkTheme: ThemeData(
+          scaffoldBackgroundColor: Colors.black,
+          brightness: Brightness.dark,
+          fontFamily: 'Space Grotesk',
+        ),
+        themeMode: themeMode,
+        home: hasCompletedOnboarding
+            ? (initialGoal == null
+                  ? GoalSetupPage(repository: repository)
+                  : MainPage(repository: repository))
+            : WelcomePage(repository: repository),
       ),
-      darkTheme: ThemeData(
-        scaffoldBackgroundColor: Colors.black,
-        brightness: Brightness.dark,
-        fontFamily: 'Space Grotesk',
-      ),
-      themeMode: themeMode,
-      home: hasCompletedOnboarding
-          ? (initialGoal == null
-                ? GoalSetupPage(repository: repository)
-                : MainPage(repository: repository))
-          : WelcomePage(repository: repository),
     );
   }
 }
