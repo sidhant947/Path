@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'step_service.dart';
+import 'step_store_file.dart';
 
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
@@ -71,11 +72,12 @@ void onStart(ServiceInstance service) async {
     StreamSubscription? stepSubscription;
     StreamSubscription? stopSubscription;
     StreamSubscription? updateSubscription;
+    StreamSubscription? syncSubscription;
 
     void startTracking() {
       stepSubscription?.cancel();
       stepSubscription = stepService.getTodayStepsStream().listen(
-        (steps) {
+        (steps) async {
           currentSteps = steps;
           _updateNotification(service, currentSteps, goal);
 
@@ -83,6 +85,18 @@ void onStart(ServiceInstance service) async {
             'steps': currentSteps,
             'goal': goal,
           });
+
+          // Persist to file for reliable cross-isolate access
+          await StepStoreFile.save(
+            todaySteps: currentSteps,
+            walkingSteps: prefs.getInt('today_walking_steps') ?? 0,
+            runningSteps: prefs.getInt('today_running_steps') ?? 0,
+            lifetimeSteps: prefs.getInt('lifetime_steps') ?? 0,
+            pbSteps: prefs.getInt('pb_steps') ?? 0,
+            pbStepsDate: prefs.getString('pb_steps_date') ?? '',
+            pbStreak: prefs.getInt('pb_streak') ?? 0,
+            hourlyStepsString: prefs.getString('today_hourly_steps') ?? '{}',
+          );
         },
         onError: (error) {
           debugPrint("Background service: Step stream error: $error");
@@ -97,9 +111,11 @@ void onStart(ServiceInstance service) async {
 
     startTracking();
 
-    // Periodically refresh notification to keep it visible
+    // Periodically refresh notification & send heartbeat to main isolate
     int lastDay = DateTime.now().day;
-    final refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+    final refreshTimer = Timer.periodic(const Duration(seconds: 30), (
+      timer,
+    ) async {
       if (DateTime.now().day != lastDay) {
         lastDay = DateTime.now().day;
         await prefs.reload();
@@ -110,12 +126,31 @@ void onStart(ServiceInstance service) async {
         goal = _getCurrentGoal(prefs);
         _updateNotification(service, currentSteps, goal);
       }
+
+      // Heartbeat: ensure main isolate gets latest data even if step events are missed
+      service.invoke('steps_updated_in_background', {
+        'steps': currentSteps,
+        'goal': goal,
+      });
+
+      // Persist to file as a reliable fallback for cross-isolate reads
+      await StepStoreFile.save(
+        todaySteps: currentSteps,
+        walkingSteps: prefs.getInt('today_walking_steps') ?? 0,
+        runningSteps: prefs.getInt('today_running_steps') ?? 0,
+        lifetimeSteps: prefs.getInt('lifetime_steps') ?? 0,
+        pbSteps: prefs.getInt('pb_steps') ?? 0,
+        pbStepsDate: prefs.getString('pb_steps_date') ?? '',
+        pbStreak: prefs.getInt('pb_streak') ?? 0,
+        hourlyStepsString: prefs.getString('today_hourly_steps') ?? '{}',
+      );
     });
 
     stopSubscription = service.on('stopService').listen((event) {
       stepSubscription?.cancel();
       stopSubscription?.cancel();
       updateSubscription?.cancel();
+      syncSubscription?.cancel();
       refreshTimer.cancel();
       stepService.stop();
       service.stopSelf();
@@ -134,6 +169,17 @@ void onStart(ServiceInstance service) async {
       debugPrint("Background service: Goal updated to $goal");
 
       _updateNotification(service, currentSteps, goal);
+    });
+
+    // Handle sync requests from the main isolate (e.g. when app resumes)
+    syncSubscription = service.on('sync_request').listen((event) async {
+      await prefs.reload();
+      currentSteps = prefs.getInt('today_steps') ?? currentSteps;
+      goal = _getCurrentGoal(prefs);
+      service.invoke('steps_updated_in_background', {
+        'steps': currentSteps,
+        'goal': goal,
+      });
     });
   } catch (e) {
     debugPrint("Background service onStart error: $e");
