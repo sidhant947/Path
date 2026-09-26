@@ -1,0 +1,2 @@
+-keep class androidx.glance.** { *; }
+-keep class androidx.health.connect.** { *; }

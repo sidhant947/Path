@@ -2,7 +2,7 @@
 
 **Privacy-focused, lightweight, and fully open-source step tracking.**
 
-Path is a modern pedometer designed for those who value their privacy and want a clean, no-nonsense way to track their daily activity. Built with Flutter, it operates entirely on-device, with zero dependencies on Google Play Services or external servers.
+Path is a modern pedometer designed for those who value their privacy and want a clean, no-nonsense way to track their daily activity.
 
 
 ## Features

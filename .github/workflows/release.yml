@@ -1,16 +1,12 @@
-name: Build & Release APK
+name: Build & Release APK & AAB
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v1.0.0)'
+        description: 'Version tag (e.g. v2.0.0)'
         required: true
-        default: 'v1.0.0'
-      flutter_version:
-        description: 'Flutter version'
-        required: false
-        default: ''
+        default: 'v2.0.0'
 
 permissions:
   contents: write
@@ -23,55 +19,42 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ github.event.inputs.flutter_version }}
-          flutter-version-file: ${{ github.event.inputs.flutter_version == '' && 'pubspec.yaml' || '' }}
-          channel: 'stable'
-          cache: true
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Print Flutter Version
-        run: flutter --version
+      - name: Grant Execute Permission for Gradle Wrapper
+        run: chmod +x gradlew
 
-      - name: Get Dependencies
-        run: |
-          flutter pub get
-          sed -i -e 's/-Wl,/-Wl,--build-id=none,/' ${PUB_CACHE}/hosted/*/jni-*/src/CMakeLists.txt
-          
       - name: Setup Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
-          echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=upload-keystore.jks" >> android/key.properties
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/upload-keystore.jks
+            echo "storePassword=${{ secrets.STORE_PASSWORD }}" > key.properties
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> key.properties
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> key.properties
+            echo "storeFile=upload-keystore.jks" >> key.properties
+          fi
 
-      - name: Build Universal APK
-        run: flutter build apk --release
-
-      - name: Build Split APKs
-        run: flutter build apk --release --split-per-abi
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
 
       - name: Build App Bundle
-        run: flutter build appbundle --release
+        run: ./gradlew bundleRelease
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
           files: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/app-x86_64-release.apk
-            build/app/outputs/bundle/release/app-release.aab
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
