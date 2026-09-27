@@ -23,6 +23,10 @@ import com.sidhant.path.ui.screens.StatsScreen
 import com.sidhant.path.ui.screens.TodayScreen
 import com.sidhant.path.ui.screens.WelcomeScreen
 import com.sidhant.path.ui.theme.PathTheme
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.sidhant.path.widget.PathWidget
 
 import androidx.activity.compose.BackHandler
 
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = StepRepository(this)
+        repository.handleDateChangeIfNeeded()
 
         if (repository.isOnboardingComplete()) {
             startStepService()
@@ -180,6 +185,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         repository.handleDateChangeIfNeeded()
         trackingService?.updateWidget()
+        lifecycleScope.launch(Dispatchers.IO) {
+            PathWidget.updateWidget(applicationContext)
+        }
         refreshUiTrigger++
     }
 

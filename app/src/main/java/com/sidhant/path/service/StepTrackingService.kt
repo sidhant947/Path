@@ -171,35 +171,7 @@ class StepTrackingService : Service(), SensorEventListener {
 
     fun updateWidget() {
         serviceScope.launch {
-            try {
-                val glanceManager = GlanceAppWidgetManager(applicationContext)
-                val glanceIds = glanceManager.getGlanceIds(PathWidget::class.java)
-                val widget = PathWidget()
-                if (glanceIds.isNotEmpty()) {
-                    for (glanceId in glanceIds) {
-                        widget.update(applicationContext, glanceId)
-                    }
-                } else {
-                    widget.updateAll(applicationContext)
-                }
-            } catch (e: Exception) {
-                try {
-                    PathWidget().updateAll(applicationContext)
-                } catch (_: Exception) {}
-            }
-
-            try {
-                val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
-                val component = ComponentName(applicationContext, PathWidgetReceiver::class.java)
-                val ids = appWidgetManager.getAppWidgetIds(component)
-                if (ids != null && ids.isNotEmpty()) {
-                    val intent = Intent(applicationContext, PathWidgetReceiver::class.java).apply {
-                        action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-                    }
-                    applicationContext.sendBroadcast(intent)
-                }
-            } catch (_: Exception) {}
+            PathWidget.updateWidget(applicationContext)
         }
     }
 

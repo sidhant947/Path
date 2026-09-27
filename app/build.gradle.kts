@@ -14,14 +14,14 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.sidhant.path"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sidhant.path"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 12
-        versionName = "2.0.0"
+        targetSdk = 36
+        versionCode = 13
+        versionName = "2.0.1"
     }
 
     dependenciesInfo {
@@ -42,7 +42,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

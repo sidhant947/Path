@@ -75,7 +75,7 @@ class StepRepository(private val context: Context) {
     fun getLastSensorTotal(): Int = prefs.getInt("last_sensor_total", -1)
     fun setLastSensorTotal(total: Int) = prefs.edit().putInt("last_sensor_total", total).apply()
 
-    fun getLastSavedDate(): String = prefs.getString("last_saved_date", getCurrentDateString()) ?: getCurrentDateString()
+    fun getLastSavedDate(): String = prefs.getString("last_saved_date", "") ?: ""
     fun setLastSavedDate(dateStr: String) = prefs.edit().putString("last_saved_date", dateStr).apply()
 
     fun getCurrentGoal(): Int {
@@ -123,7 +123,7 @@ class StepRepository(private val context: Context) {
                 val d = try { sdf.parse(parts[0]) } catch (e: Exception) { null }
                 if (d != null) Triple(parts[0], d, parts[1]) else null
             } else null
-        }.sortedByDescending { it.second }.take(20)
+        }.sortedByDescending { it.second }.take(60)
 
         val newSet = sortedList.map { "${it.first}:${it.third}" }.toSet()
         prefs.edit().putStringSet("step_history_list", newSet).apply()
@@ -159,9 +159,15 @@ class StepRepository(private val context: Context) {
     fun handleDateChangeIfNeeded(): Boolean {
         val lastDate = getLastSavedDate()
         val todayStr = getCurrentDateString()
+        if (lastDate.isEmpty()) {
+            setLastSavedDate(todayStr)
+            return false
+        }
         if (lastDate != todayStr) {
             val prevSteps = getTodaySteps()
-            storeStepInHistory(lastDate, prevSteps)
+            if (prevSteps > 0) {
+                storeStepInHistory(lastDate, prevSteps)
+            }
 
             setTodaySteps(0)
             setTodayWalkingSteps(0)
@@ -189,22 +195,22 @@ class StepRepository(private val context: Context) {
     fun getStreak(): Int {
         val todaySteps = getTodaySteps()
         var currentStreak = if (todaySteps > 0) 1 else 0
-        val history = getHistoricalSteps(14)
+        val history = getHistoricalSteps(60)
         if (history.isEmpty()) return currentStreak
 
+        val historyMap = history.associateBy { it.dateStr }
         val cal = Calendar.getInstance()
         cal.add(Calendar.DAY_OF_YEAR, -1)
         val sdf = SimpleDateFormat("yyyy-M-d", Locale.US)
 
-        for (record in history) {
+        while (true) {
             val targetStr = sdf.format(cal.time)
-            if (record.dateStr == targetStr) {
-                if (record.steps > 0) {
-                    currentStreak++
-                    cal.add(Calendar.DAY_OF_YEAR, -1)
-                } else {
-                    break
-                }
+            val record = historyMap[targetStr]
+            if (record != null && record.steps > 0) {
+                currentStreak++
+                cal.add(Calendar.DAY_OF_YEAR, -1)
+            } else {
+                break
             }
         }
         return currentStreak
