@@ -8,10 +8,13 @@ import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class HealthConnectManager(private val context: Context) {
+
+    private val prefs = context.getSharedPreferences("path_health_connect", Context.MODE_PRIVATE)
 
     fun isNativeAndroid14Available(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -44,7 +47,8 @@ class HealthConnectManager(private val context: Context) {
 
         val zoneId = ZoneId.systemDefault()
         val now = Instant.now()
-        val startOfDay = ZonedDateTime.now(zoneId).toLocalDate().atStartOfDay(zoneId).toInstant()
+        val today = LocalDate.now(zoneId)
+        val startOfDay = today.atStartOfDay(zoneId).toInstant()
 
         if (stepsCount <= 0 || startOfDay.isAfter(now)) return
 
@@ -57,7 +61,20 @@ class HealthConnectManager(private val context: Context) {
         )
 
         try {
-            client.insertRecords(listOf(record))
-        } catch (e: Exception) {}
+            val lastSyncDate = prefs.getString("last_sync_date", "")
+            val todayStr = today.toString()
+            if (lastSyncDate != todayStr) {
+                prefs.edit().putString("last_sync_date", todayStr).remove("last_record_id").apply()
+            }
+            val oldRecordId = prefs.getString("last_record_id", null)
+            if (oldRecordId != null) {
+                client.deleteRecords(StepsRecord::class, listOf(oldRecordId), emptyList())
+            }
+            val response = client.insertRecords(listOf(record))
+            val newRecordId = response.recordIdsList.firstOrNull()
+            if (newRecordId != null) {
+                prefs.edit().putString("last_record_id", newRecordId).apply()
+            }
+        } catch (_: Exception) {}
     }
 }

@@ -91,19 +91,32 @@ class StepRepository(private val context: Context) {
     }
 
     fun getCurrentDateString(): String {
-        val sdf = SimpleDateFormat("yyyy-M-d", Locale.US)
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         return sdf.format(Date())
+    }
+
+    private fun parseDate(dateStr: String): Date? {
+        val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val legacyFormat = SimpleDateFormat("yyyy-M-d", Locale.US)
+        return try {
+            isoFormat.parse(dateStr)
+        } catch (_: Exception) {
+            try {
+                legacyFormat.parse(dateStr)
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 
     fun getHistoricalSteps(days: Int = 14): List<DailyStepRecord> {
         val historySet = prefs.getStringSet("step_history_list", null) ?: emptySet()
-        val sdf = SimpleDateFormat("yyyy-M-d", Locale.US)
         val records = historySet.mapNotNull { entry ->
             val parts = entry.split(":")
             if (parts.size == 2) {
                 val dateStr = parts[0]
                 val steps = parts[1].toIntOrNull() ?: 0
-                val date = try { sdf.parse(dateStr) } catch (e: Exception) { null }
+                val date = parseDate(dateStr)
                 if (date != null) DailyStepRecord(dateStr, date, steps) else null
             } else null
         }.sortedByDescending { it.date }
@@ -112,7 +125,6 @@ class StepRepository(private val context: Context) {
     }
 
     fun storeStepInHistory(dateStr: String, steps: Int) {
-        val sdf = SimpleDateFormat("yyyy-M-d", Locale.US)
         val historySet = prefs.getStringSet("step_history_list", null)?.toMutableSet() ?: mutableSetOf()
         historySet.removeAll { it.startsWith("$dateStr:") }
         historySet.add("$dateStr:$steps")
@@ -120,7 +132,7 @@ class StepRepository(private val context: Context) {
         val sortedList = historySet.mapNotNull { entry ->
             val parts = entry.split(":")
             if (parts.size == 2) {
-                val d = try { sdf.parse(parts[0]) } catch (e: Exception) { null }
+                val d = parseDate(parts[0])
                 if (d != null) Triple(parts[0], d, parts[1]) else null
             } else null
         }.sortedByDescending { it.second }.take(60)
@@ -141,7 +153,7 @@ class StepRepository(private val context: Context) {
 
         val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY).toString()
         val jsonStr = getTodayHourlyStepsJson()
-        val json = try { JSONObject(jsonStr) } catch (e: Exception) { JSONObject() }
+        val json = try { JSONObject(jsonStr) } catch (_: Exception) { JSONObject() }
         val currentHourSteps = json.optInt(currentHour, 0)
         json.put(currentHour, currentHourSteps + delta)
         setTodayHourlyStepsJson(json.toString())
@@ -174,7 +186,6 @@ class StepRepository(private val context: Context) {
             setTodayRunningSteps(0)
             setTodayHourlyStepsJson("{}")
             setLastSavedDate(todayStr)
-            setLastSensorTotal(-1)
             return true
         }
         return false
@@ -198,13 +209,13 @@ class StepRepository(private val context: Context) {
         val history = getHistoricalSteps(60)
         if (history.isEmpty()) return currentStreak
 
-        val historyMap = history.associateBy { it.dateStr }
+        val isoSdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val historyMap = history.associateBy { isoSdf.format(it.date) }
         val cal = Calendar.getInstance()
         cal.add(Calendar.DAY_OF_YEAR, -1)
-        val sdf = SimpleDateFormat("yyyy-M-d", Locale.US)
 
         while (true) {
-            val targetStr = sdf.format(cal.time)
+            val targetStr = isoSdf.format(cal.time)
             val record = historyMap[targetStr]
             if (record != null && record.steps > 0) {
                 currentStreak++

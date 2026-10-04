@@ -82,12 +82,25 @@ class StepTrackingService : Service(), SensorEventListener {
         startForegroundServiceInternal()
     }
 
+    private var lastThrottledUpdate = 0L
+    private var accumulatedDelta = 0
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundServiceInternal()
-        updateNotification()
-        updateWidget()
-        syncHealthConnect()
+        throttleUpdates(force = true)
         return START_STICKY
+    }
+
+    private fun throttleUpdates(delta: Int = 0, force: Boolean = false) {
+        accumulatedDelta += delta
+        val now = System.currentTimeMillis()
+        if (force || now - lastThrottledUpdate > 10000L || accumulatedDelta >= 25) {
+            lastThrottledUpdate = now
+            accumulatedDelta = 0
+            updateNotification()
+            updateWidget()
+            syncHealthConnect()
+        }
     }
 
     private fun startForegroundServiceInternal() {
@@ -119,21 +132,18 @@ class StepTrackingService : Service(), SensorEventListener {
                     val isRunning = motionDetector.currentActivity == ActivityType.RUNNING
                     repository.recordStepDelta(delta, isRunning)
                     repository.checkAndSaveStreakPb()
-                    updateNotification()
-                    updateWidget()
-                    syncHealthConnect()
+                    throttleUpdates(delta)
                     onStepsUpdatedListener?.invoke()
                 }
                 repository.setLastSensorTotal(totalSteps)
             } else if (totalSteps < lastTotal) {
-                if (totalSteps < 100 || totalSteps < lastTotal / 2) {
+                val isReboot = totalSteps < 1000 || totalSteps < lastTotal / 2
+                if (isReboot) {
                     if (!motionDetector.isInVehicle) {
                         val isRunning = motionDetector.currentActivity == ActivityType.RUNNING
                         repository.recordStepDelta(totalSteps, isRunning)
                         repository.checkAndSaveStreakPb()
-                        updateNotification()
-                        updateWidget()
-                        syncHealthConnect()
+                        throttleUpdates(totalSteps)
                         onStepsUpdatedListener?.invoke()
                     }
                     repository.setLastSensorTotal(totalSteps)
@@ -152,9 +162,7 @@ class StepTrackingService : Service(), SensorEventListener {
                     val isRunning = motionDetector.currentActivity == ActivityType.RUNNING
                     repository.recordStepDelta(1, isRunning)
                     repository.checkAndSaveStreakPb()
-                    updateNotification()
-                    updateWidget()
-                    syncHealthConnect()
+                    throttleUpdates(1)
                     onStepsUpdatedListener?.invoke()
                 }
             }

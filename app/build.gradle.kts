@@ -20,8 +20,8 @@ android {
         applicationId = "com.sidhant.path"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "2.0.1"
+        versionCode = 3014
+        versionName = "2.0.2"
     }
 
     dependenciesInfo {

@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
+            trackingService?.onStepsUpdatedListener = null
             trackingService = null
             isBound = false
         }
@@ -192,6 +193,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        trackingService?.onStepsUpdatedListener = null
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false

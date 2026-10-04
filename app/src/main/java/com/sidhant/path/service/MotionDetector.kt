@@ -16,7 +16,7 @@ class MotionDetector(context: Context) : SensorEventListener {
     private val accelerometer: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val gyroscope: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
-    private val windowSize = 50
+    private val windowSize = 20
     private var vehicleVarThreshold = 0.6
     private var vehicleSpikeThreshold = 3.0
     private val bikeVarMin = 0.6
@@ -53,8 +53,8 @@ class MotionDetector(context: Context) : SensorEventListener {
     }
 
     fun start() {
-        accelerometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
-        gyroscope?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        accelerometer?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
+        gyroscope?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
     }
 
     fun stop() {
@@ -87,8 +87,9 @@ class MotionDetector(context: Context) : SensorEventListener {
 
     private fun evaluate() {
         val now = System.currentTimeMillis()
-        if (now - lastEvaluation < 200) return
-        if (accCount < windowSize || gyroCount < 10) return
+        if (now - lastEvaluation < 500) return
+        val hasGyro = gyroscope != null
+        if (accCount < windowSize || (hasGyro && gyroCount < 10)) return
 
         lastEvaluation = now
 
@@ -108,22 +109,23 @@ class MotionDetector(context: Context) : SensorEventListener {
         val accVar = accVarSum / accCount
 
         var gyroSum = 0.0
-        for (i in 0 until gyroCount) {
+        val gyroIterations = if (hasGyro) gyroCount else 0
+        for (i in 0 until gyroIterations) {
             gyroSum += gyroMagWindow[i]
         }
-        val gyroMean = gyroSum / gyroCount
+        val gyroMean = if (gyroIterations > 0) gyroSum / gyroIterations else 0.0
 
-        val vehicleLike = accVar < vehicleVarThreshold && maxAcc < vehicleSpikeThreshold
-        val bikeLike = accVar in bikeVarMin..bikeVarMax && gyroMean > 0.4
-
-        isInVehicle = vehicleLike || bikeLike
+        val vehicleLike = accVar in 0.05..vehicleVarThreshold && maxAcc < vehicleSpikeThreshold
+        val bikeLike = hasGyro && accVar in bikeVarMin..bikeVarMax && gyroMean > 0.4
 
         currentActivity = when {
-            isInVehicle -> ActivityType.VEHICLE
             accVar < 0.05 -> ActivityType.STATIONARY
+            vehicleLike || bikeLike -> ActivityType.VEHICLE
             accVar >= 3.0 -> ActivityType.RUNNING
             else -> ActivityType.WALKING
         }
+
+        isInVehicle = (currentActivity == ActivityType.VEHICLE)
     }
 
     private fun magnitude(x: Float, y: Float, z: Float): Double {
