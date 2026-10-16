@@ -58,7 +58,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.health.connect.client.PermissionController
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -98,6 +101,50 @@ fun SettingsScreen(
         val hasAll = grantedPermissions.containsAll(healthConnectManager.requiredPermissions)
         healthConnectEnabled = hasAll
         repository.setHealthConnectEnabled(hasAll)
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            val success = try {
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    repository.exportBackup(outputStream)
+                }
+                true
+            } catch (e: Exception) {
+                false
+            }
+            val msg = if (success) "Backup exported successfully" else "Failed to export backup"
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val success = try {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    repository.importBackup(inputStream)
+                } ?: false
+            } catch (e: Exception) {
+                false
+            }
+            if (success) {
+                selectedAccent = repository.getAccentColorName()
+                selectedTheme = repository.getThemeMode()
+                flexibleGoals = repository.isFlexibleGoalsEnabled()
+                weekdayGoalText = repository.getGoalWeekday().toString()
+                weekendGoalText = repository.getGoalWeekend().toString()
+                motionSensitivity = repository.getMotionSensitivity()
+                healthConnectEnabled = repository.isHealthConnectEnabled()
+                onThemeOrAccentChanged()
+                Toast.makeText(context, "Backup restored successfully", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Failed to restore backup", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     val currentAccentColor = getAccentColor(selectedAccent)
@@ -410,6 +457,71 @@ fun SettingsScreen(
                                     }
                                 },
                                 colors = SwitchDefaults.colors(checkedThumbColor = currentAccentColor)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            SectionHeader("BACKUP & RESTORE", Icons.Rounded.Backup, currentAccentColor)
+            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(cardColor, shape = RoundedCornerShape(20.dp))
+                    .padding(16.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "DATA BACKUP",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SpaceGroteskFontFamily,
+                        color = primaryTextColor
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Export your step history, personal records, and settings to a JSON file, or restore from a previous backup.",
+                        fontSize = 12.sp,
+                        fontFamily = SpaceGroteskFontFamily,
+                        color = Color.Gray,
+                        lineHeight = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                exportLauncher.launch("path_backup_${repository.getCurrentDateString()}.json")
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "EXPORT",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                fontFamily = SpaceGroteskFontFamily,
+                                letterSpacing = 1.0.sp,
+                                color = primaryTextColor
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                importLauncher.launch(arrayOf("application/json", "*/*"))
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "IMPORT",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                fontFamily = SpaceGroteskFontFamily,
+                                letterSpacing = 1.0.sp,
+                                color = primaryTextColor
                             )
                         }
                     }

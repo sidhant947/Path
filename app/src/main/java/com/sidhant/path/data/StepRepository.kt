@@ -2,7 +2,10 @@ package com.sidhant.path.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.InputStream
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -231,6 +234,56 @@ class StepRepository(private val context: Context) {
         val currentStreak = getStreak()
         if (currentStreak > getPbStreak()) {
             setPbStreak(currentStreak)
+        }
+    }
+
+    fun exportBackup(outputStream: OutputStream) {
+        val json = JSONObject()
+        for ((key, value) in prefs.all) {
+            when (value) {
+                is Set<*> -> {
+                    val array = JSONArray()
+                    for (item in value) {
+                        array.put(item)
+                    }
+                    json.put(key, array)
+                }
+                else -> json.put(key, value)
+            }
+        }
+        outputStream.bufferedWriter().use { writer ->
+            writer.write(json.toString(2))
+        }
+    }
+
+    fun importBackup(inputStream: InputStream): Boolean {
+        return try {
+            val jsonStr = inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(jsonStr)
+            val editor = prefs.edit()
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                if (key == "last_sensor_total") continue
+                when (val value = json.get(key)) {
+                    is Boolean -> editor.putBoolean(key, value)
+                    is Number -> editor.putInt(key, value.toInt())
+                    is String -> editor.putString(key, value)
+                    is JSONArray -> {
+                        val set = mutableSetOf<String>()
+                        for (i in 0 until value.length()) {
+                            set.add(value.getString(i))
+                        }
+                        editor.putStringSet(key, set)
+                    }
+                }
+            }
+            editor.putInt("last_sensor_total", -1)
+            editor.apply()
+            handleDateChangeIfNeeded()
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }

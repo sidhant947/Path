@@ -20,8 +20,8 @@ android {
         applicationId = "com.sidhant.path"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3014
-        versionName = "2.0.2"
+        versionCode = 3015
+        versionName = "2.0.3"
     }
 
     dependenciesInfo {
@@ -43,6 +43,9 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
+            optimization {
+                  enable = true // Enables code and resource optimizations.
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
