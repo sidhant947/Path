@@ -3,11 +3,14 @@ package com.sidhant.path.ui.screens
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -66,12 +69,50 @@ fun OnboardingScreen(
     val accentColor = getAccentColor(accentColorName)
     var currentStep by remember { mutableIntStateOf(0) }
 
-    var activityGranted by remember { mutableStateOf(false) }
+    var activityGranted by remember {
+        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        mutableStateOf(granted)
+    }
     var batteryGranted by remember {
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         mutableStateOf(pm.isIgnoringBatteryOptimizations(context.packageName))
     }
-    var notificationGranted by remember { mutableStateOf(false) }
+    var notificationGranted by remember {
+        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        mutableStateOf(granted)
+    }
+
+    LifecycleResumeEffect(Unit) {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        batteryGranted = pm.isIgnoringBatteryOptimizations(context.packageName)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            activityGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+        onPauseOrDispose { }
+    }
 
     val activityLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -191,25 +232,33 @@ fun OnboardingScreen(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(vertical = 20.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.CheckCircle,
                         contentDescription = null,
                         tint = accentColor,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Granted",
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
-            } else {
-                Button(
-                    onClick = {
+            }
+
+            Button(
+                onClick = {
+                    if (isCurrentGranted) {
+                        if (currentStep < steps.lastIndex) {
+                            currentStep++
+                        } else {
+                            onCompleteOnboarding()
+                        }
+                    } else {
                         when (currentStep) {
                             0 -> {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -239,24 +288,24 @@ fun OnboardingScreen(
                                 }
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp),
-                    shape = RoundedCornerShape(30.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = accentColor,
-                        contentColor = Color.Black
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(0.dp)
-                ) {
-                    Text(
-                        text = step.buttonLabel,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp
-                    )
-                }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp),
+                shape = RoundedCornerShape(30.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = Color.Black
+                ),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Text(
+                    text = if (isCurrentGranted) "CONTINUE" else step.buttonLabel,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp
+                )
             }
 
             Spacer(modifier = Modifier.height(40.dp))
