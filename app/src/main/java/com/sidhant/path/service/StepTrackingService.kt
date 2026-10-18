@@ -84,11 +84,18 @@ class StepTrackingService : Service(), SensorEventListener {
 
     private var lastThrottledUpdate = 0L
     private var accumulatedDelta = 0
+    private var pendingVehicleSteps = 0
+    private var lastStepTime = 0L
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        reloadMotionSensitivity()
         startForegroundServiceInternal()
         throttleUpdates(force = true)
         return START_STICKY
+    }
+
+    fun reloadMotionSensitivity() {
+        motionDetector.setSensitivity(repository.getMotionSensitivity())
     }
 
     private fun throttleUpdates(delta: Int = 0, force: Boolean = false) {
@@ -105,7 +112,7 @@ class StepTrackingService : Service(), SensorEventListener {
 
     private fun startForegroundServiceInternal() {
         val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
@@ -128,24 +135,42 @@ class StepTrackingService : Service(), SensorEventListener {
                 repository.setLastSensorTotal(totalSteps)
             } else if (totalSteps > lastTotal) {
                 val delta = totalSteps - lastTotal
-                if (!motionDetector.isInVehicle) {
+                val now = System.currentTimeMillis()
+                if (motionDetector.isInVehicle) {
+                    if (now - lastStepTime > 10000L) {
+                        pendingVehicleSteps = 0
+                    }
+                    pendingVehicleSteps += delta
+                    lastStepTime = now
+                    if (pendingVehicleSteps >= 10) {
+                        val isRunning = motionDetector.currentActivity == ActivityType.RUNNING
+                        repository.recordStepDelta(pendingVehicleSteps, isRunning)
+                        repository.checkAndSaveStreakPb()
+                        throttleUpdates(pendingVehicleSteps)
+                        onStepsUpdatedListener?.invoke()
+                        pendingVehicleSteps = 0
+                    }
+                } else {
                     val isRunning = motionDetector.currentActivity == ActivityType.RUNNING
-                    repository.recordStepDelta(delta, isRunning)
+                    val stepsToAdd = delta + pendingVehicleSteps
+                    pendingVehicleSteps = 0
+                    lastStepTime = now
+                    repository.recordStepDelta(stepsToAdd, isRunning)
                     repository.checkAndSaveStreakPb()
-                    throttleUpdates(delta)
+                    throttleUpdates(stepsToAdd)
                     onStepsUpdatedListener?.invoke()
                 }
                 repository.setLastSensorTotal(totalSteps)
             } else if (totalSteps < lastTotal) {
                 val isReboot = totalSteps < 1000 || totalSteps < lastTotal / 2
                 if (isReboot) {
-                    if (!motionDetector.isInVehicle) {
-                        val isRunning = motionDetector.currentActivity == ActivityType.RUNNING
-                        repository.recordStepDelta(totalSteps, isRunning)
-                        repository.checkAndSaveStreakPb()
-                        throttleUpdates(totalSteps)
-                        onStepsUpdatedListener?.invoke()
-                    }
+                    val isRunning = motionDetector.currentActivity == ActivityType.RUNNING
+                    val stepsToAdd = totalSteps + pendingVehicleSteps
+                    pendingVehicleSteps = 0
+                    repository.recordStepDelta(stepsToAdd, isRunning)
+                    repository.checkAndSaveStreakPb()
+                    throttleUpdates(stepsToAdd)
+                    onStepsUpdatedListener?.invoke()
                     repository.setLastSensorTotal(totalSteps)
                 }
             }

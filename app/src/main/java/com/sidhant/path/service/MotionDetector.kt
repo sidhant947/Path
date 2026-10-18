@@ -21,6 +21,8 @@ class MotionDetector(context: Context) : SensorEventListener {
     private var vehicleSpikeThreshold = 3.0
     private val bikeVarMin = 0.6
     private val bikeVarMax = 2.5
+    private var enabled = true
+    private var enableBike = false
 
     private val accMagWindow = DoubleArray(windowSize)
     private val gyroMagWindow = DoubleArray(windowSize)
@@ -37,17 +39,27 @@ class MotionDetector(context: Context) : SensorEventListener {
 
     fun setSensitivity(sensitivity: String) {
         when (sensitivity) {
-            "high" -> {
-                vehicleVarThreshold = 0.8
-                vehicleSpikeThreshold = 4.0
+            "off" -> {
+                enabled = false
+                enableBike = false
             }
             "low" -> {
-                vehicleVarThreshold = 0.4
+                enabled = true
+                vehicleVarThreshold = 0.3
                 vehicleSpikeThreshold = 2.0
+                enableBike = false
+            }
+            "high" -> {
+                enabled = true
+                vehicleVarThreshold = 0.8
+                vehicleSpikeThreshold = 4.0
+                enableBike = true
             }
             else -> {
-                vehicleVarThreshold = 0.6
+                enabled = true
+                vehicleVarThreshold = 0.5
                 vehicleSpikeThreshold = 3.0
+                enableBike = false
             }
         }
     }
@@ -115,13 +127,13 @@ class MotionDetector(context: Context) : SensorEventListener {
         }
         val gyroMean = if (gyroIterations > 0) gyroSum / gyroIterations else 0.0
 
-        val vehicleLike = accVar in 0.05..vehicleVarThreshold && maxAcc < vehicleSpikeThreshold
-        val bikeLike = hasGyro && accVar in bikeVarMin..bikeVarMax && gyroMean > 0.4
+        val vehicleLike = enabled && accVar in 0.05..vehicleVarThreshold && maxAcc < vehicleSpikeThreshold
+        val bikeLike = enabled && enableBike && hasGyro && accVar in bikeVarMin..bikeVarMax && gyroMean > 0.6 && maxAcc < 1.5
 
         currentActivity = when {
             accVar < 0.05 -> ActivityType.STATIONARY
             vehicleLike || bikeLike -> ActivityType.VEHICLE
-            accVar >= 3.0 -> ActivityType.RUNNING
+            accVar >= 8.0 -> ActivityType.RUNNING
             else -> ActivityType.WALKING
         }
 

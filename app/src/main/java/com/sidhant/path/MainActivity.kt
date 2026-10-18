@@ -163,6 +163,7 @@ class MainActivity : ComponentActivity() {
                             onThemeOrAccentChanged = {
                                 themeMode = repository.getThemeMode()
                                 accentColorName = repository.getAccentColorName()
+                                trackingService?.reloadMotionSensitivity()
                                 trackingService?.updateNotification()
                                 trackingService?.updateWidget()
                                 refreshUiTrigger++

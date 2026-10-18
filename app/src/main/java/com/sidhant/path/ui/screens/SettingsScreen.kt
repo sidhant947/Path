@@ -367,7 +367,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "High sensitivity counts fewer false steps in buses/trains but might miss light footsteps. Low sensitivity counts more active steps but may register transport steps.",
+                        text = "Off disables vehicle filtering. Low sensitivity counts more active steps. High sensitivity filters more vehicle movements.",
                         fontSize = 12.sp,
                         fontFamily = SpaceGroteskFontFamily,
                         color = Color.Gray,
@@ -375,7 +375,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        listOf("low", "medium", "high").forEach { sensitivity ->
+                        listOf("off", "low", "medium", "high").forEach { sensitivity ->
                             val selected = motionSensitivity == sensitivity
                             Box(
                                 modifier = Modifier
@@ -388,6 +388,7 @@ fun SettingsScreen(
                                     .clickable {
                                         motionSensitivity = sensitivity
                                         repository.setMotionSensitivity(sensitivity)
+                                        onThemeOrAccentChanged()
                                     }
                                     .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
