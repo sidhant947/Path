@@ -83,7 +83,7 @@ class MainActivity : ComponentActivity() {
             @Suppress("UNUSED_VARIABLE")
             val dummyTrigger = refreshUiTrigger
 
-            PathTheme(themeMode = themeMode) {
+            PathTheme(themeMode = themeMode, accentColorName = accentColorName) {
                 when (currentScreen) {
                     ScreenState.WELCOME -> {
                         WelcomeScreen(

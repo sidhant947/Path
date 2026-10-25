@@ -6,7 +6,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,9 +77,8 @@ fun SettingsScreen(
 ) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
-    val isDark = isSystemInDarkTheme()
-    val cardColor = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF2F2F2)
-    val primaryTextColor = if (isDark) Color.White else Color.Black
+    val cardColor = MaterialTheme.colorScheme.surface
+    val primaryTextColor = MaterialTheme.colorScheme.onSurface
 
     var selectedAccent by remember { mutableStateOf(repository.getAccentColorName()) }
     var selectedTheme by remember { mutableStateOf(repository.getThemeMode()) }
@@ -259,7 +257,7 @@ fun SettingsScreen(
                                     .weight(1f)
                                     .padding(horizontal = 4.dp)
                                     .background(
-                                        color = if (selected) currentAccentColor else if (isDark) Color(0xFF2C2C2C) else Color(0xFFE0E0E0),
+                                        color = if (selected) currentAccentColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .clickable {
@@ -327,7 +325,6 @@ fun SettingsScreen(
                                         weekdayGoalText = it
                                         repository.setGoalWeekday(it.toIntOrNull() ?: 10000)
                                     },
-                                    isDark = isDark,
                                     modifier = Modifier.weight(1f)
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
@@ -338,7 +335,6 @@ fun SettingsScreen(
                                         weekendGoalText = it
                                         repository.setGoalWeekend(it.toIntOrNull() ?: 6000)
                                     },
-                                    isDark = isDark,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -382,7 +378,7 @@ fun SettingsScreen(
                                     .weight(1f)
                                     .padding(horizontal = 4.dp)
                                     .background(
-                                        color = if (selected) currentAccentColor else if (isDark) Color(0xFF2C2C2C) else Color(0xFFE0E0E0),
+                                        color = if (selected) currentAccentColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .clickable {
@@ -607,11 +603,10 @@ private fun InputField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val textColor = if (isDark) Color.White else Color.Black
-    val bg = if (isDark) Color(0xFF2C2C2C) else Color(0xFFE0E0E0)
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val bg = MaterialTheme.colorScheme.surfaceVariant
 
     Column(modifier = modifier) {
         Text(

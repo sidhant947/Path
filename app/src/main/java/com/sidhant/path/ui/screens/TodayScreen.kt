@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,8 +67,7 @@ fun TodayScreen(
     onNavigateToStats: () -> Unit
 ) {
     val accentColor = getAccentColor(accentColorName)
-    val isDark = isSystemInDarkTheme()
-    val defaultTextColor = if (isDark) Color.White else Color.Black
+    val defaultTextColor = MaterialTheme.colorScheme.onBackground
     val progress = if (goal > 0) (todaySteps.toFloat() / goal.toFloat()).coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
@@ -115,7 +113,7 @@ fun TodayScreen(
                 distanceKm = distanceKm,
                 calories = calories,
                 activeMinutes = activeMinutes,
-                textColor = Color.Black,
+                textColor = MaterialTheme.colorScheme.onPrimary,
                 onOpenGoalSetup = onOpenGoalSetup,
                 onNavigateToStats = onNavigateToStats
             )

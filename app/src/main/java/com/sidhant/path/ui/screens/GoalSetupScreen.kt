@@ -1,7 +1,6 @@
 package com.sidhant.path.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -38,10 +37,9 @@ fun GoalSetupScreen(
     onSaveGoal: (Int) -> Unit
 ) {
     var goalText by remember { mutableStateOf(if (currentGoal > 0) currentGoal.toString() else "10000") }
-    val isDark = isSystemInDarkTheme()
-    val textColor = if (isDark) Color.White else Color.Black
-    val buttonBg = if (isDark) Color.White else Color.Black
-    val buttonFg = if (isDark) Color.Black else Color.White
+    val textColor = MaterialTheme.colorScheme.onBackground
+    val buttonBg = MaterialTheme.colorScheme.onBackground
+    val buttonFg = MaterialTheme.colorScheme.background
 
     Box(
         modifier = Modifier

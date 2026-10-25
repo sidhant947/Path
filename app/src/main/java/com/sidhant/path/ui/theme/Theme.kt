@@ -1,16 +1,21 @@
 package com.sidhant.path.ui.theme
 
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.core.view.WindowCompat
 import com.sidhant.path.R
 
 val LimeAccent = Color(0xFFC7F900)
@@ -58,24 +63,37 @@ val AppTypography = Typography(
 private val DarkColorScheme = darkColorScheme(
     primary = LimeAccent,
     background = Color.Black,
-    surface = Color(0xFF121212),
+    surface = Color(0xFF1A1A1A),
     onPrimary = Color.Black,
     onBackground = Color.White,
-    onSurface = Color.White
+    onSurface = Color.White,
+    surfaceVariant = Color(0xFF2C2C2C),
+    onSurfaceVariant = Color.Gray,
+    surfaceContainer = Color(0xFF0D0D0D),
+    surfaceContainerHigh = Color(0xFF2A2A2A),
+    outline = Color(0xFF333333),
+    outlineVariant = Color(0xFF222222)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = LimeAccent,
     background = Color.White,
-    surface = Color(0xFFF5F5F5),
+    surface = Color(0xFFF2F2F2),
     onPrimary = Color.Black,
     onBackground = Color.Black,
-    onSurface = Color.Black
+    onSurface = Color.Black,
+    surfaceVariant = Color(0xFFE0E0E0),
+    onSurfaceVariant = Color.Gray,
+    surfaceContainer = Color.White,
+    surfaceContainerHigh = Color(0xFFE0E0E0),
+    outline = Color(0xFFD6D6D6),
+    outlineVariant = Color(0xFFEAEAEA)
 )
 
 @Composable
 fun PathTheme(
     themeMode: String = "system",
+    accentColorName: String = "Lime",
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -84,7 +102,25 @@ fun PathTheme(
         else -> isSystemInDarkTheme()
     }
 
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val accentColor = getAccentColor(accentColorName)
+    val baseScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = baseScheme.copy(
+        primary = accentColor,
+        onPrimary = if (accentColor == BlueAccent) Color.White else Color.Black
+    )
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                window.statusBarColor = colorScheme.background.toArgb()
+                window.navigationBarColor = colorScheme.background.toArgb()
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+                WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
+            }
+        }
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,

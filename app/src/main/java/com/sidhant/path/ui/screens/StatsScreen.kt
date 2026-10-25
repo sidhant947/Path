@@ -2,7 +2,6 @@ package com.sidhant.path.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +23,7 @@ import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.LocalCafe
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.NightsStay
@@ -31,6 +31,8 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.StackedLineChart
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.WbTwilight
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,9 +74,8 @@ fun StatsScreen(
     onNavigateToToday: () -> Unit
 ) {
     val accentColor = getAccentColor(accentColorName)
-    val isDark = isSystemInDarkTheme()
-    val cardBg = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF2F2F2)
-    val textColor = if (isDark) Color.White else Color.Black
+    val cardBg = MaterialTheme.colorScheme.surface
+    val textColor = MaterialTheme.colorScheme.onBackground
 
     Column(
         modifier = Modifier
@@ -108,13 +110,20 @@ fun StatsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            BuyMeACoffeeButton(
+                cardBg = cardBg,
+                textColor = textColor,
+                accentColor = accentColor
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             ActivityChartSection(
                 todaySteps = todaySteps,
                 goal = goal,
                 history = history,
                 cardBg = cardBg,
-                accentColor = accentColor,
-                isDark = isDark
+                accentColor = accentColor
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -133,8 +142,7 @@ fun StatsScreen(
                 hourlyStepsJson = hourlyStepsJson,
                 cardBg = cardBg,
                 textColor = textColor,
-                accentColor = accentColor,
-                isDark = isDark
+                accentColor = accentColor
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -147,8 +155,7 @@ fun StatsScreen(
                 totalDistanceKm = totalDistanceKm,
                 cardBg = cardBg,
                 textColor = textColor,
-                accentColor = accentColor,
-                isDark = isDark
+                accentColor = accentColor
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -297,13 +304,53 @@ private fun EncouragementSection(
 }
 
 @Composable
+private fun BuyMeACoffeeButton(
+    cardBg: Color,
+    textColor: Color,
+    accentColor: Color
+) {
+    val uriHandler = LocalUriHandler.current
+    Button(
+        onClick = {
+            try {
+                uriHandler.openUri("https://ko-fi.com/sidhant947")
+            } catch (_: Exception) {
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = cardBg,
+            contentColor = textColor
+        ),
+        elevation = ButtonDefaults.buttonElevation(0.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.LocalCafe,
+            contentDescription = null,
+            tint = accentColor,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "Buy Me a Coffee",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = SpaceGroteskFontFamily,
+            color = textColor
+        )
+    }
+}
+
+@Composable
 private fun ActivityChartSection(
     todaySteps: Int,
     goal: Int,
     history: List<DailyStepRecord>,
     cardBg: Color,
-    accentColor: Color,
-    isDark: Boolean
+    accentColor: Color
 ) {
     val todayRecord = DailyStepRecord("Today", Date(), todaySteps)
     val displayRecords = (listOf(todayRecord) + history).take(7).reversed()
@@ -367,7 +414,7 @@ private fun ActivityChartSection(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .background(
-                                        color = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f),
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
                                         shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
                                     )
                             )
@@ -495,8 +542,7 @@ private fun HourlySection(
     hourlyStepsJson: String,
     cardBg: Color,
     textColor: Color,
-    accentColor: Color,
-    isDark: Boolean
+    accentColor: Color
 ) {
     var night = 0
     var morning = 0
@@ -544,10 +590,10 @@ private fun HourlySection(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.Bottom
             ) {
-                HourlyBar("NIGHT", night, maxSteps, Icons.Rounded.NightsStay, textColor, accentColor, isDark)
-                HourlyBar("MORNING", morning, maxSteps, Icons.Rounded.WbSunny, textColor, accentColor, isDark)
-                HourlyBar("AFTERNOON", afternoon, maxSteps, Icons.Rounded.WbTwilight, textColor, accentColor, isDark)
-                HourlyBar("EVENING", evening, maxSteps, Icons.Rounded.DarkMode, textColor, accentColor, isDark)
+                HourlyBar("NIGHT", night, maxSteps, Icons.Rounded.NightsStay, textColor, accentColor)
+                HourlyBar("MORNING", morning, maxSteps, Icons.Rounded.WbSunny, textColor, accentColor)
+                HourlyBar("AFTERNOON", afternoon, maxSteps, Icons.Rounded.WbTwilight, textColor, accentColor)
+                HourlyBar("EVENING", evening, maxSteps, Icons.Rounded.DarkMode, textColor, accentColor)
             }
         }
     }
@@ -560,8 +606,7 @@ private fun HourlyBar(
     maxSteps: Int,
     icon: ImageVector,
     textColor: Color,
-    accentColor: Color,
-    isDark: Boolean
+    accentColor: Color
 ) {
     val barHeightRatio = (steps.toFloat() / maxSteps.toFloat()).coerceIn(0.1f, 1f)
 
@@ -582,7 +627,7 @@ private fun HourlyBar(
                 .height(100.dp)
                 .width(14.dp)
                 .background(
-                    color = if (isDark) Color(0xFF2A2A2A) else Color(0xFFE0E0E0),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     shape = RoundedCornerShape(7.dp)
                 ),
             contentAlignment = Alignment.BottomCenter
@@ -616,8 +661,7 @@ private fun AchievementsSection(
     totalDistanceKm: Float,
     cardBg: Color,
     textColor: Color,
-    accentColor: Color,
-    isDark: Boolean
+    accentColor: Color
 ) {
     Box(
         modifier = Modifier
@@ -643,7 +687,6 @@ private fun AchievementsSection(
                     icon = Icons.Rounded.EmojiEvents,
                     iconTint = Color(0xFFFFC107),
                     textColor = textColor,
-                    isDark = isDark,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -654,7 +697,6 @@ private fun AchievementsSection(
                     icon = Icons.Rounded.LocalFireDepartment,
                     iconTint = Color(0xFFFF9800),
                     textColor = textColor,
-                    isDark = isDark,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -667,7 +709,6 @@ private fun AchievementsSection(
                     icon = Icons.Rounded.StackedLineChart,
                     iconTint = accentColor,
                     textColor = textColor,
-                    isDark = isDark,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -678,7 +719,6 @@ private fun AchievementsSection(
                     icon = Icons.Rounded.Map,
                     iconTint = Color(0xFF2196F3),
                     textColor = textColor,
-                    isDark = isDark,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -694,10 +734,9 @@ private fun AchievementCard(
     icon: ImageVector,
     iconTint: Color,
     textColor: Color,
-    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val cardInnerBg = if (isDark) Color(0xFF0D0D0D) else Color.White
+    val cardInnerBg = MaterialTheme.colorScheme.surfaceContainer
 
     Box(
         modifier = modifier
