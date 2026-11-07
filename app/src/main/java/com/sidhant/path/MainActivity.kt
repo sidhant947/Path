@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.sidhant.path.data.AutoBackup
 import com.sidhant.path.data.StepRepository
 import com.sidhant.path.service.StepTrackingService
 import com.sidhant.path.ui.screens.GoalSetupScreen
@@ -190,6 +191,7 @@ class MainActivity : ComponentActivity() {
         repository.handleDateChangeIfNeeded()
         trackingService?.updateWidget()
         lifecycleScope.launch(Dispatchers.IO) {
+            AutoBackup(applicationContext, repository).runIfDue()
             PathWidget.updateWidget(applicationContext)
         }
         refreshUiTrigger++

@@ -78,6 +78,18 @@ class StepRepository(private val context: Context) {
     fun getLastSensorTotal(): Int = prefs.getInt("last_sensor_total", -1)
     fun setLastSensorTotal(total: Int) = prefs.edit().putInt("last_sensor_total", total).apply()
 
+    fun isAutoBackupEnabled(): Boolean = prefs.getBoolean("auto_backup_enabled", false)
+    fun setAutoBackupEnabled(enabled: Boolean) = prefs.edit().putBoolean("auto_backup_enabled", enabled).apply()
+
+    fun getAutoBackupFolderUri(): String? = prefs.getString("auto_backup_folder_uri", null)
+    fun setAutoBackupFolderUri(uri: String?) = prefs.edit().putString("auto_backup_folder_uri", uri).apply()
+
+    fun getAutoBackupFolderName(): String = prefs.getString("auto_backup_folder_name", "") ?: ""
+    fun setAutoBackupFolderName(name: String) = prefs.edit().putString("auto_backup_folder_name", name).apply()
+
+    fun getLastAutoBackupDate(): String = prefs.getString("last_auto_backup_date", "") ?: ""
+    fun setLastAutoBackupDate(dateStr: String) = prefs.edit().putString("last_auto_backup_date", dateStr).apply()
+
     fun getLastSavedDate(): String = prefs.getString("last_saved_date", "") ?: ""
     fun setLastSavedDate(dateStr: String) = prefs.edit().putString("last_saved_date", dateStr).apply()
 

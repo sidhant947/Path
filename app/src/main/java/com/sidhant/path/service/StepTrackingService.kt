@@ -22,6 +22,7 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.updateAll
 import com.sidhant.path.MainActivity
 import com.sidhant.path.R
+import com.sidhant.path.data.AutoBackup
 import com.sidhant.path.data.StepRepository
 import com.sidhant.path.health.HealthConnectManager
 import com.sidhant.path.widget.PathWidget
@@ -39,6 +40,7 @@ class StepTrackingService : Service(), SensorEventListener {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val binder = LocalBinder()
     private lateinit var repository: StepRepository
+    private lateinit var autoBackup: AutoBackup
     private lateinit var healthConnectManager: HealthConnectManager
     private lateinit var motionDetector: MotionDetector
     private lateinit var sensorManager: SensorManager
@@ -60,6 +62,8 @@ class StepTrackingService : Service(), SensorEventListener {
     override fun onCreate() {
         super.onCreate()
         repository = StepRepository(this)
+        autoBackup = AutoBackup(this, repository)
+        serviceScope.launch { autoBackup.runIfDue() }
         healthConnectManager = HealthConnectManager(this)
         motionDetector = MotionDetector(this)
         motionDetector.setSensitivity(repository.getMotionSensitivity())
@@ -125,7 +129,9 @@ class StepTrackingService : Service(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent?) {
         event ?: return
-        repository.handleDateChangeIfNeeded()
+        if (repository.handleDateChangeIfNeeded()) {
+            serviceScope.launch { autoBackup.runIfDue() }
+        }
 
         if (event.sensor.type == Sensor.TYPE_STEP_COUNTER) {
             val totalSteps = event.values[0].toInt()

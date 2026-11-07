@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Tune
@@ -63,8 +64,11 @@ import androidx.health.connect.client.PermissionController
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.sidhant.path.health.HealthConnectManager
+import com.sidhant.path.data.AutoBackup
 import com.sidhant.path.data.StepRepository
 import com.sidhant.path.ui.theme.SpaceGroteskFontFamily
 import com.sidhant.path.ui.theme.getAccentColor
@@ -88,6 +92,11 @@ fun SettingsScreen(
     var weekendGoalText by remember { mutableStateOf(repository.getGoalWeekend().toString()) }
 
     var motionSensitivity by remember { mutableStateOf(repository.getMotionSensitivity()) }
+
+    val autoBackup = remember { AutoBackup(context, repository) }
+    var autoBackupEnabled by remember { mutableStateOf(repository.isAutoBackupEnabled()) }
+    var autoBackupFolderName by remember { mutableStateOf(repository.getAutoBackupFolderName()) }
+    var lastAutoBackupDate by remember { mutableStateOf(repository.getLastAutoBackupDate()) }
 
     val healthConnectManager = remember { HealthConnectManager(context) }
     val isHcAvailable = remember { healthConnectManager.isNativeAndroid14Available() }
@@ -142,6 +151,19 @@ fun SettingsScreen(
             } else {
                 Toast.makeText(context, "Failed to restore backup", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            val success = autoBackup.selectFolder(uri)
+            autoBackupEnabled = repository.isAutoBackupEnabled()
+            autoBackupFolderName = repository.getAutoBackupFolderName()
+            lastAutoBackupDate = repository.getLastAutoBackupDate()
+            val msg = if (success) "Auto backup folder set" else "Failed to access folder"
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -520,6 +542,93 @@ fun SettingsScreen(
                                 letterSpacing = 1.0.sp,
                                 color = primaryTextColor
                             )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "AUTO BACKUP",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = primaryTextColor
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Overwrite Path.json in a folder of your choice once a day.",
+                                fontSize = 12.sp,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = Color.Gray,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = autoBackupEnabled,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    if (repository.getAutoBackupFolderUri() != null) {
+                                        autoBackup.setEnabled(true)
+                                        autoBackupEnabled = true
+                                        coroutineScope.launch {
+                                            val success = withContext(Dispatchers.IO) { autoBackup.run() }
+                                            lastAutoBackupDate = repository.getLastAutoBackupDate()
+                                            val msg = if (success) "Auto backup enabled" else "Failed to write backup"
+                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        folderLauncher.launch(null)
+                                    }
+                                } else {
+                                    autoBackup.setEnabled(false)
+                                    autoBackupEnabled = false
+                                }
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = currentAccentColor)
+                        )
+                    }
+
+                    AnimatedVisibility(visible = autoBackupEnabled) {
+                        Column {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = { folderLauncher.launch(null) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Folder,
+                                    contentDescription = null,
+                                    tint = primaryTextColor,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (autoBackupFolderName.isBlank()) "CHOOSE FOLDER"
+                                    else autoBackupFolderName.uppercase(),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    letterSpacing = 1.0.sp,
+                                    color = primaryTextColor
+                                )
+                            }
+                            if (lastAutoBackupDate.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Last backup: $lastAutoBackupDate",
+                                    fontSize = 12.sp,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    color = Color.Gray
+                                )
+                            }
                         }
                     }
                 }
