@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sidhant.path.ui.theme.getAccentColor
+import com.sidhant.path.ui.theme.getAccentContentColor
 
 data class OnboardingStepData(
     val icon: ImageVector,
@@ -296,7 +297,7 @@ fun OnboardingScreen(
                 shape = RoundedCornerShape(30.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = accentColor,
-                    contentColor = Color.Black
+                    contentColor = getAccentContentColor(accentColorName)
                 ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {

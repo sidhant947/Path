@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sidhant.path.ui.theme.getAccentColor
+import com.sidhant.path.ui.theme.getAccentContentColor
 
 @Composable
 fun WelcomeScreen(
@@ -112,7 +113,7 @@ fun WelcomeScreen(
                 shape = RoundedCornerShape(30.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = accentColor,
-                    contentColor = Color.Black
+                    contentColor = getAccentContentColor(accentColorName)
                 ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.DeveloperMode
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +53,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -66,8 +69,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.sidhant.path.health.HealthConnectManager
 import com.sidhant.path.data.StepRepository
+import com.sidhant.path.ui.theme.PresetAccents
 import com.sidhant.path.ui.theme.SpaceGroteskFontFamily
 import com.sidhant.path.ui.theme.getAccentColor
+import com.sidhant.path.ui.theme.getAccentContentColor
+import com.sidhant.path.ui.theme.getAccentHex
+import com.sidhant.path.ui.theme.isCustomAccent
+import com.sidhant.path.ui.theme.parseAccentHex
 
 @Composable
 fun SettingsScreen(
@@ -82,6 +90,7 @@ fun SettingsScreen(
 
     var selectedAccent by remember { mutableStateOf(repository.getAccentColorName()) }
     var selectedTheme by remember { mutableStateOf(repository.getThemeMode()) }
+    var showCustomColorDialog by remember { mutableStateOf(false) }
 
     var flexibleGoals by remember { mutableStateOf(repository.isFlexibleGoalsEnabled()) }
     var weekdayGoalText by remember { mutableStateOf(repository.getGoalWeekday().toString()) }
@@ -146,6 +155,20 @@ fun SettingsScreen(
     }
 
     val currentAccentColor = getAccentColor(selectedAccent)
+    val currentAccentContentColor = getAccentContentColor(selectedAccent)
+
+    if (showCustomColorDialog) {
+        CustomAccentDialog(
+            initialValue = getAccentHex(selectedAccent),
+            onDismiss = { showCustomColorDialog = false },
+            onApply = { hex ->
+                selectedAccent = hex
+                repository.setAccentColorName(hex)
+                onThemeOrAccentChanged()
+                showCustomColorDialog = false
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -207,7 +230,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        listOf("Lime", "Pink", "Blue", "Green", "Orange").forEach { name ->
+                        PresetAccents.forEach { name ->
                             val color = getAccentColor(name)
                             val isSelected = selectedAccent == name
                             Box(
@@ -236,6 +259,51 @@ fun SettingsScreen(
                                 }
                             }
                         }
+
+                        val customSelected = isCustomAccent(selectedAccent)
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    color = if (customSelected) currentAccentColor else MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    width = if (customSelected) 3.dp else 1.dp,
+                                    color = if (customSelected) primaryTextColor else Color.Gray.copy(alpha = 0.5f),
+                                    shape = CircleShape
+                                )
+                                .clickable { showCustomColorDialog = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (customSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = "Custom accent color",
+                                    tint = currentAccentContentColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.Palette,
+                                    contentDescription = "Custom accent color",
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (isCustomAccent(selectedAccent)) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "CUSTOM: ${selectedAccent.uppercase()}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SpaceGroteskFontFamily,
+                            color = Color.Gray,
+                            letterSpacing = 1.0.sp
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -273,7 +341,7 @@ fun SettingsScreen(
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SpaceGroteskFontFamily,
-                                    color = if (selected) Color.Black else primaryTextColor
+                                    color = if (selected) currentAccentContentColor else primaryTextColor
                                 )
                             }
                         }
@@ -394,7 +462,7 @@ fun SettingsScreen(
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SpaceGroteskFontFamily,
-                                    color = if (selected) Color.Black else primaryTextColor
+                                    color = if (selected) currentAccentContentColor else primaryTextColor
                                 )
                             }
                         }
@@ -580,6 +648,106 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
+}
+
+@Composable
+private fun CustomAccentDialog(
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onApply: (String) -> Unit
+) {
+    var hexInput by remember { mutableStateOf(initialValue) }
+    val parsedColor = parseAccentHex(hexInput)
+    val textColor = MaterialTheme.colorScheme.onSurface
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = "CUSTOM ACCENT",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SpaceGroteskFontFamily,
+                letterSpacing = 1.5.sp,
+                color = textColor
+            )
+        },
+        text = {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                color = parsedColor ?: MaterialTheme.colorScheme.surfaceVariant,
+                                shape = CircleShape
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    BasicTextField(
+                        value = hexInput,
+                        onValueChange = { input ->
+                            val cleaned = input.uppercase().filter { it.isDigit() || it in 'A'..'F' || it == '#' }
+                            if (cleaned.length <= 9) hexInput = cleaned
+                        },
+                        textStyle = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = SpaceGroteskFontFamily,
+                            color = textColor
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Ascii,
+                            capitalization = KeyboardCapitalization.Characters
+                        ),
+                        cursorBrush = SolidColor(textColor),
+                        singleLine = true,
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                            ) {
+                                innerTextField()
+                            }
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = if (parsedColor == null) "Enter a hex value like #CBA6F7" else "Hex values are saved as your accent color",
+                    fontSize = 12.sp,
+                    fontFamily = SpaceGroteskFontFamily,
+                    color = if (parsedColor == null) MaterialTheme.colorScheme.error else Color.Gray
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onApply(getAccentHex(hexInput)) },
+                enabled = parsedColor != null
+            ) {
+                Text(
+                    text = "APPLY",
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    letterSpacing = 1.0.sp
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "CANCEL",
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    letterSpacing = 1.0.sp
+                )
+            }
+        }
+    )
 }
 
 @Composable

@@ -9,6 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
@@ -24,13 +25,36 @@ val BlueAccent = Color(0xFF007BFF)
 val GreenAccent = Color(0xFF2ECC71)
 val OrangeAccent = Color(0xFFE67E22)
 
+val PresetAccents = listOf("Lime", "Pink", "Blue", "Green", "Orange")
+
+fun parseAccentHex(value: String): Color? {
+    val hex = value.trim().removePrefix("#")
+    if (hex.length != 6 && hex.length != 8) return null
+    val parsed = hex.toLongOrNull(16) ?: return null
+    return if (hex.length == 6) Color(0xFF000000 or parsed) else Color(parsed)
+}
+
+fun isCustomAccent(name: String): Boolean = parseAccentHex(name) != null
+
+fun getAccentHex(name: String): String = "#%06X".format(getAccentColor(name).toArgb() and 0xFFFFFF)
+
 fun getAccentColor(name: String): Color {
     return when (name) {
         "Pink" -> PinkAccent
         "Blue" -> BlueAccent
         "Green" -> GreenAccent
         "Orange" -> OrangeAccent
-        else -> LimeAccent
+        "Lime" -> LimeAccent
+        else -> parseAccentHex(name) ?: LimeAccent
+    }
+}
+
+fun getAccentContentColor(name: String): Color {
+    val accentColor = getAccentColor(name)
+    return when {
+        isCustomAccent(name) -> if (accentColor.luminance() > 0.45f) Color.Black else Color.White
+        accentColor == BlueAccent -> Color.White
+        else -> Color.Black
     }
 }
 
@@ -106,7 +130,7 @@ fun PathTheme(
     val baseScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val colorScheme = baseScheme.copy(
         primary = accentColor,
-        onPrimary = if (accentColor == BlueAccent) Color.White else Color.Black
+        onPrimary = getAccentContentColor(accentColorName)
     )
 
     val view = LocalView.current
