@@ -38,6 +38,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +51,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.sidhant.path.data.DailyStepRecord
 import com.sidhant.path.ui.theme.SpaceGroteskFontFamily
 import com.sidhant.path.ui.theme.getAccentColor
@@ -76,6 +81,8 @@ fun StatsScreen(
     val accentColor = getAccentColor(accentColorName)
     val cardBg = MaterialTheme.colorScheme.surface
     val textColor = MaterialTheme.colorScheme.onBackground
+
+    var selectedDay by remember { mutableStateOf<DailyStepRecord?>(null) }
 
     Column(
         modifier = Modifier
@@ -123,7 +130,8 @@ fun StatsScreen(
                 goal = goal,
                 history = history,
                 cardBg = cardBg,
-                accentColor = accentColor
+                accentColor = accentColor,
+                onDayPress = { selectedDay = it }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -164,7 +172,8 @@ fun StatsScreen(
                 todaySteps = todaySteps,
                 history = history,
                 accentColor = accentColor,
-                textColor = textColor
+                textColor = textColor,
+                onDayPress = { selectedDay = it }
             )
 
             Spacer(modifier = Modifier.height(40.dp))
@@ -203,6 +212,95 @@ fun StatsScreen(
                     fontFamily = SpaceGroteskFontFamily,
                     color = textColor
                 )
+            }
+        }
+    }
+
+    selectedDay?.let { record ->
+        DayDetailDialog(
+            record = record,
+            goal = goal,
+            accentColor = accentColor,
+            onDismiss = { selectedDay = null }
+        )
+    }
+}
+
+@Composable
+private fun DayDetailDialog(
+    record: DailyStepRecord,
+    goal: Int,
+    accentColor: Color,
+    onDismiss: () -> Unit
+) {
+    val textColor = MaterialTheme.colorScheme.onBackground
+    val goalProgress = if (goal > 0) (record.steps.toFloat() / goal.toFloat()).coerceIn(0f, 1f) else 0f
+
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(24.dp))
+                .padding(24.dp)
+        ) {
+            Column {
+                Text(
+                    text = SimpleDateFormat("EEEE", Locale.US).format(record.date).uppercase(Locale.US),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    letterSpacing = 1.2.sp,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = SimpleDateFormat("dd MMMM yyyy", Locale.US).format(record.date),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    color = textColor
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = formatNumber(record.steps),
+                    fontSize = 44.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    color = accentColor
+                )
+                Text(
+                    text = "STEPS",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    letterSpacing = 1.2.sp,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "GOAL ${(goalProgress * 100).toInt()}%",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    letterSpacing = 1.2.sp,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.Gray.copy(alpha = 0.2f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(goalProgress.coerceAtLeast(0.01f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(accentColor)
+                    )
+                }
             }
         }
     }
@@ -350,7 +448,8 @@ private fun ActivityChartSection(
     goal: Int,
     history: List<DailyStepRecord>,
     cardBg: Color,
-    accentColor: Color
+    accentColor: Color,
+    onDayPress: (DailyStepRecord) -> Unit
 ) {
     val todayRecord = DailyStepRecord("Today", Date(), todaySteps)
     val displayRecords = (listOf(todayRecord) + history).take(7).reversed()
@@ -402,7 +501,9 @@ private fun ActivityChartSection(
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onDayPress(record) }
                     ) {
                         Box(
                             modifier = Modifier
@@ -779,7 +880,8 @@ private fun HistoryListSection(
     todaySteps: Int,
     history: List<DailyStepRecord>,
     accentColor: Color,
-    textColor: Color
+    textColor: Color,
+    onDayPress: (DailyStepRecord) -> Unit
 ) {
     val todayRecord = DailyStepRecord("Today", Date(), todaySteps)
     val displayRecords = (listOf(todayRecord) + history).take(7)
@@ -793,6 +895,7 @@ private fun HistoryListSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { onDayPress(record) }
                     .padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically

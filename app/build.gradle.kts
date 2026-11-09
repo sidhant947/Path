@@ -60,6 +60,11 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -83,4 +88,10 @@ dependencies {
     implementation(libs.androidx.health.connect)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Unit tests: Robolectric-based Compose screenshot verification (test-only, not shipped in APK)
+    testImplementation(libs.androidx.junit)
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.androidx.compose.ui.test.manifest)
+    testImplementation("org.robolectric:robolectric:4.17")
 }
