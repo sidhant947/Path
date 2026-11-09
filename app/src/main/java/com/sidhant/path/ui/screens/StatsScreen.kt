@@ -13,9 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -57,6 +62,7 @@ import com.sidhant.path.ui.theme.SpaceGroteskFontFamily
 import com.sidhant.path.ui.theme.getAccentColor
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -452,9 +458,10 @@ private fun ActivityChartSection(
     onDayPress: (DailyStepRecord) -> Unit
 ) {
     val todayRecord = DailyStepRecord("Today", Date(), todaySteps)
-    val displayRecords = (listOf(todayRecord) + history).take(7).reversed()
+    val allRecords = listOf(todayRecord) + history
+    val pageCount = ((allRecords.size + 6) / 7).coerceAtLeast(1)
 
-    val maxSteps = (displayRecords.maxOfOrNull { it.steps } ?: goal).coerceAtLeast(goal)
+    val maxSteps = (allRecords.maxOfOrNull { it.steps } ?: goal).coerceAtLeast(goal)
     val maxY = maxSteps * 1.2f
 
     Box(
@@ -488,56 +495,103 @@ private fun ActivityChartSection(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
+            val pagerState = rememberPagerState(initialPage = pageCount - 1, pageCount = { pageCount })
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                displayRecords.forEachIndexed { index, record ->
-                    val isToday = index == displayRecords.lastIndex
-                    val stepHeightRatio = (record.steps.toFloat() / maxY).coerceIn(0.05f, 1f)
+                    .weight(1f)
+            ) { page ->
+                // Pages run oldest → newest (rightmost page = current week):
+                // page 0 holds the oldest available 7-day window.
+                val window = pageCount - 1 - page
+                val slice = allRecords.drop(window * 7).take(7)
+                // Pad a partial (first) page with zero-step days so every page shows
+                // all 7 columns; missing days sit on the older, left side.
+                val displayRecords = if (slice.size < 7) {
+                    val pad = (1..(7 - slice.size)).map { k ->
+                        val cal = Calendar.getInstance()
+                        cal.time = slice.last().date
+                        cal.add(Calendar.DAY_OF_YEAR, -k)
+                        DailyStepRecord("", cal.time, 0)
+                    }
+                    (slice + pad).reversed()
+                } else {
+                    slice.reversed()
+                }
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onDayPress(record) }
-                    ) {
-                        Box(
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    displayRecords.forEachIndexed { index, record ->
+                        val isToday = window == 0 && index == displayRecords.lastIndex
+                        val stepHeightRatio = (record.steps.toFloat() / maxY).coerceIn(0.05f, 1f)
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxWidth(0.5f),
-                            contentAlignment = Alignment.BottomCenter
+                                .clickable { onDayPress(record) }
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
-                                        shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
-                                    )
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight(stepHeightRatio)
-                                    .background(
-                                        color = if (isToday) accentColor else accentColor.copy(alpha = 0.4f),
-                                        shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
-                                    )
+                                    .weight(1f)
+                                    .fillMaxWidth(0.5f),
+                                contentAlignment = Alignment.BottomCenter
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                        )
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .fillMaxHeight(stepHeightRatio)
+                                        .background(
+                                            color = if (isToday) accentColor else accentColor.copy(alpha = 0.4f),
+                                            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                        )
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val dayLabel = SimpleDateFormat("E", Locale.US).format(record.date).take(1)
+                            Text(
+                                text = dayLabel,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = Color.Gray
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val dayLabel = if (isToday) "T" else SimpleDateFormat("E", Locale.US).format(record.date).take(1)
-                        Text(
-                            text = dayLabel,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = SpaceGroteskFontFamily,
-                            color = Color.Gray
+                    }
+                }
+            }
+
+            if (pageCount > 1) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(pageCount) { page ->
+                        Box(
+                            modifier = Modifier
+                                .size(if (page == pagerState.currentPage) 6.dp else 4.dp)
+                                .background(
+                                    color = if (page == pagerState.currentPage) accentColor else Color.Gray.copy(alpha = 0.4f),
+                                    shape = CircleShape
+                                )
                         )
+                        if (page < pageCount - 1) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
                     }
                 }
             }

@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sidhant.path.data.DailyStepRecord
 import com.sidhant.path.MainActivity
@@ -76,9 +78,74 @@ class StatsDayDialogTest {
     private fun scrollToText(text: String) {
         // The stats content lives in a verticalScroll Column; drive it via the scroll
         // semantics action rather than swipes so the target lands inside the window.
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText(text))
+        // Node [0] in DFS order = the outer vertical scroll column (the pager is [1]).
+        composeRule.onAllNodes(hasScrollAction())[0].performScrollToNode(hasText(text))
         composeRule.waitForIdle()
         composeRule.onNodeWithText(text).assertExists()
+    }
+
+    @Test
+    fun chartSwipeRevealsPreviousWeekDialog() {
+        val iso = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val history = (1..17).map { n ->
+            DailyStepRecord(iso.format(dateAt(n)), dateAt(n), 5000 - 200 * n)
+        }
+
+        composeRule.activityRule.scenario.onActivity { activity: MainActivity ->
+            val frame = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+            frame?.removeAllViews()
+        }
+        composeRule.waitForIdle()
+
+        composeRule.setContent {
+            PathTheme(themeMode = "dark", accentColorName = "Lime") {
+                StatsScreen(
+                    todaySteps = 4012,
+                    goal = 10000,
+                    streak = 7,
+                    walkingSteps = 3100,
+                    runningSteps = 912,
+                    hourlyStepsJson = "{}",
+                    history = history,
+                    pbSteps = 15450,
+                    pbStepsDate = iso.format(dateAt(4)),
+                    pbStreak = 12,
+                    lifetimeSteps = 234567,
+                    totalDistanceKm = 165.4f,
+                    accentColorName = "Lime",
+                    onOpenSettings = {},
+                    onNavigateToToday = {}
+                )
+            }
+        }
+        screenshot("chart_this_week.png")
+
+        // Today's column is labelled by its real weekday (hardcoded "T" bug fixed).
+        composeRule.onNodeWithText("M").assertExists()
+
+        // Pages run oldest → newest, so the app starts on the rightmost (current week)
+        // page; dragging rightward reveals the previous 7-day window to its left.
+        // 17 days of data = 3 pages: two full weeks plus a partial first page that is
+        // zero-padded to a full 7 columns. Two swipes land on that padded page.
+        composeRule.onAllNodes(hasScrollAction())[1].performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+        composeRule.onAllNodes(hasScrollAction())[1].performTouchInput { swipeRight() }
+        composeRule.waitForIdle()
+        screenshot("chart_previous_week_swiped.png")
+
+        // On the padded page now shown, the oldest real day is day 14: rightmost bar,
+        // a Monday labelled "M"; 5000 - 200*14 = 2200 steps → GOAL 22%. The three
+        // zero-padded days sit to its left with their own weekday labels.
+        val mondays = composeRule.onAllNodesWithText("M").fetchSemanticsNodes()
+        assertTrue("no 'M' chart label found", mondays.isNotEmpty())
+        val idx = mondays.withIndex().maxBy { it.value.positionInRoot.x }.index
+        composeRule.onAllNodesWithText("M")[idx].performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("STEPS").assertExists()
+        composeRule.onNodeWithText("GOAL 22%").assertExists()
+
+        screenshot("chart_previous_week_dialog.png", dialog = true)
     }
 
     @Test
