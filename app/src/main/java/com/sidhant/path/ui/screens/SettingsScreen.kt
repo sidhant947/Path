@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBackIos
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeveloperMode
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Tune
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -58,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.documentfile.provider.DocumentFile
 import android.widget.Toast
 import androidx.health.connect.client.PermissionController
 import androidx.compose.material.icons.rounded.Backup
@@ -81,6 +84,7 @@ fun SettingsScreen(
     val primaryTextColor = MaterialTheme.colorScheme.onSurface
 
     var selectedAccent by remember { mutableStateOf(repository.getAccentColorName()) }
+    var hexInput by remember { mutableStateOf(if (selectedAccent.startsWith("#")) selectedAccent else "") }
     var selectedTheme by remember { mutableStateOf(repository.getThemeMode()) }
 
     var flexibleGoals by remember { mutableStateOf(repository.isFlexibleGoalsEnabled()) }
@@ -92,6 +96,9 @@ fun SettingsScreen(
     val healthConnectManager = remember { HealthConnectManager(context) }
     val isHcAvailable = remember { healthConnectManager.isNativeAndroid14Available() }
     var healthConnectEnabled by remember { mutableStateOf(repository.isHealthConnectEnabled()) }
+    var autoBackupEnabled by remember { mutableStateOf(repository.isAutoBackupEnabled()) }
+    var autoBackupDirUri by remember { mutableStateOf(repository.getAutoBackupDirectoryUri()) }
+    var lastAutoBackupDate by remember { mutableStateOf(repository.getLastAutoBackupDate()) }
     val coroutineScope = rememberCoroutineScope()
 
     val permissionContract = PermissionController.createRequestPermissionResultContract()
@@ -99,6 +106,11 @@ fun SettingsScreen(
         val hasAll = grantedPermissions.containsAll(healthConnectManager.requiredPermissions)
         healthConnectEnabled = hasAll
         repository.setHealthConnectEnabled(hasAll)
+        if (hasAll) {
+            coroutineScope.launch {
+                healthConnectManager.writeTodaySteps(repository.getTodaySteps())
+            }
+        }
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -118,6 +130,24 @@ fun SettingsScreen(
         }
     }
 
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+            } catch (_: Exception) {}
+            val uriStr = uri.toString()
+            repository.setAutoBackupDirectoryUri(uriStr)
+            autoBackupDirUri = uriStr
+            autoBackupEnabled = true
+            repository.setAutoBackupEnabled(true)
+            repository.performAutoBackup()
+            lastAutoBackupDate = repository.getLastAutoBackupDate()
+        }
+    }
+
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -131,12 +161,16 @@ fun SettingsScreen(
             }
             if (success) {
                 selectedAccent = repository.getAccentColorName()
+                hexInput = if (selectedAccent.startsWith("#")) selectedAccent else ""
                 selectedTheme = repository.getThemeMode()
                 flexibleGoals = repository.isFlexibleGoalsEnabled()
                 weekdayGoalText = repository.getGoalWeekday().toString()
                 weekendGoalText = repository.getGoalWeekend().toString()
                 motionSensitivity = repository.getMotionSensitivity()
                 healthConnectEnabled = repository.isHealthConnectEnabled()
+                autoBackupEnabled = repository.isAutoBackupEnabled()
+                autoBackupDirUri = repository.getAutoBackupDirectoryUri()
+                lastAutoBackupDate = repository.getLastAutoBackupDate()
                 onThemeOrAccentChanged()
                 Toast.makeText(context, "Backup restored successfully", Toast.LENGTH_SHORT).show()
             } else {
@@ -221,6 +255,7 @@ fun SettingsScreen(
                                     )
                                     .clickable {
                                         selectedAccent = name
+                                        hexInput = ""
                                         repository.setAccentColorName(name)
                                         onThemeOrAccentChanged()
                                     },
@@ -230,10 +265,114 @@ fun SettingsScreen(
                                     Icon(
                                         imageVector = Icons.Rounded.Check,
                                         contentDescription = null,
-                                        tint = Color.Black,
+                                        tint = if (color.luminance() < 0.5f) Color.White else Color.Black,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "CUSTOM HEX COLOR",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SpaceGroteskFontFamily,
+                        color = Color.Gray,
+                        letterSpacing = 1.0.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val hexDigits = hexInput.filter { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+                    val customColor = runCatching {
+                        if (hexDigits.length == 6) Color(android.graphics.Color.parseColor("#$hexDigits")) else null
+                    }.getOrNull()
+                    val isCustomSelected = customColor != null && selectedAccent.equals("#$hexDigits", ignoreCase = true)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        BasicTextField(
+                            value = hexInput,
+                            onValueChange = { input ->
+                                val hasHash = input.startsWith("#")
+                                val digitsOnly = input.filter { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }.take(6).uppercase()
+                                val cleaned = if (hasHash) "#$digitsOnly" else digitsOnly
+                                hexInput = cleaned
+                                if (digitsOnly.length == 6) {
+                                    val formatted = "#$digitsOnly"
+                                    runCatching {
+                                        android.graphics.Color.parseColor(formatted)
+                                        selectedAccent = formatted
+                                        repository.setAccentColorName(formatted)
+                                        onThemeOrAccentChanged()
+                                    }
+                                }
+                            },
+                            textStyle = TextStyle(
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = primaryTextColor,
+                                textAlign = TextAlign.Start
+                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                            cursorBrush = SolidColor(primaryTextColor),
+                            singleLine = true,
+                            decorationBox = { innerTextField ->
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                ) {
+                                    if (hexInput.isEmpty()) {
+                                        Text(
+                                            text = "#RRGGBB",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = SpaceGroteskFontFamily,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                    innerTextField()
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    color = customColor ?: MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = CircleShape
+                                )
+                                .border(
+                                    width = if (isCustomSelected) 3.dp else 0.dp,
+                                    color = if (isCustomSelected) primaryTextColor else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable(enabled = customColor != null) {
+                                    val formatted = "#$hexDigits"
+                                    selectedAccent = formatted
+                                    repository.setAccentColorName(formatted)
+                                    onThemeOrAccentChanged()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (customColor != null && isCustomSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = if (customColor.luminance() < 0.5f) Color.White else Color.Black,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
                         }
                     }
@@ -444,6 +583,7 @@ fun SettingsScreen(
                                             if (healthConnectManager.hasAllPermissions()) {
                                                 healthConnectEnabled = true
                                                 repository.setHealthConnectEnabled(true)
+                                                healthConnectManager.writeTodaySteps(repository.getTodaySteps())
                                             } else {
                                                 permissionLauncher.launch(healthConnectManager.requiredPermissions)
                                             }
@@ -471,8 +611,105 @@ fun SettingsScreen(
                     .padding(16.dp)
             ) {
                 Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "DAILY AUTO BACKUP",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = primaryTextColor
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (autoBackupEnabled && lastAutoBackupDate.isNotEmpty()) {
+                                    "Automatically backs up once per day. Last: $lastAutoBackupDate"
+                                } else {
+                                    "Automatically save backup to device storage once per day."
+                                },
+                                fontSize = 12.sp,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = Color.Gray,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = autoBackupEnabled,
+                            onCheckedChange = { checked ->
+                                if (checked) {
+                                    if (autoBackupDirUri.isEmpty()) {
+                                        folderPickerLauncher.launch(null)
+                                    } else {
+                                        autoBackupEnabled = true
+                                        repository.setAutoBackupEnabled(true)
+                                        repository.checkAndPerformAutoBackup()
+                                        lastAutoBackupDate = repository.getLastAutoBackupDate()
+                                    }
+                                } else {
+                                    autoBackupEnabled = false
+                                    repository.setAutoBackupEnabled(false)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = currentAccentColor)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    val folderDisplayName = remember(autoBackupDirUri) {
+                        if (autoBackupDirUri.isNotEmpty()) {
+                            runCatching {
+                                DocumentFile.fromTreeUri(context, Uri.parse(autoBackupDirUri))?.name
+                            }.getOrNull() ?: "Custom Folder"
+                        } else {
+                            "Select folder..."
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
+                            .clickable { folderPickerLauncher.launch(null) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "BACKUP DIRECTORY",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = Color.Gray,
+                                letterSpacing = 1.0.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = folderDisplayName,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SpaceGroteskFontFamily,
+                                color = primaryTextColor
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Rounded.Folder,
+                            contentDescription = null,
+                            tint = currentAccentColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
                     Text(
-                        text = "DATA BACKUP",
+                        text = "MANUAL BACKUP",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,

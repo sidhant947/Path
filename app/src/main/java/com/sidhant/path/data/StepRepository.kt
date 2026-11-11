@@ -2,8 +2,12 @@ package com.sidhant.path.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.text.SimpleDateFormat
@@ -189,6 +193,7 @@ class StepRepository(private val context: Context) {
             setTodayRunningSteps(0)
             setTodayHourlyStepsJson("{}")
             setLastSavedDate(todayStr)
+            checkAndPerformAutoBackup()
             return true
         }
         return false
@@ -234,6 +239,60 @@ class StepRepository(private val context: Context) {
         val currentStreak = getStreak()
         if (currentStreak > getPbStreak()) {
             setPbStreak(currentStreak)
+        }
+    }
+
+    fun isAutoBackupEnabled(): Boolean = prefs.getBoolean("auto_backup_enabled", false)
+    fun setAutoBackupEnabled(enabled: Boolean) = prefs.edit().putBoolean("auto_backup_enabled", enabled).apply()
+
+    fun getAutoBackupDirectoryUri(): String = prefs.getString("auto_backup_directory_uri", "") ?: ""
+    fun setAutoBackupDirectoryUri(uri: String) = prefs.edit().putString("auto_backup_directory_uri", uri).apply()
+
+    fun getLastAutoBackupDate(): String = prefs.getString("last_auto_backup_date", "") ?: ""
+    fun setLastAutoBackupDate(date: String) = prefs.edit().putString("last_auto_backup_date", date).apply()
+
+    fun performAutoBackup(): Boolean {
+        return try {
+            val fileName = "path_auto_backup.json"
+            val todayStr = getCurrentDateString()
+            val uriString = getAutoBackupDirectoryUri()
+            if (uriString.isNotEmpty()) {
+                val dir = DocumentFile.fromTreeUri(context, Uri.parse(uriString))
+                if (dir != null && dir.exists() && dir.canWrite()) {
+                    dir.findFile(fileName)?.delete()
+                    dir.listFiles().filter { it.name?.startsWith("path_auto_backup") == true && it.name != fileName }.forEach { it.delete() }
+                    val docFile = dir.createFile("application/json", fileName)
+                    if (docFile != null) {
+                        context.contentResolver.openOutputStream(docFile.uri)?.use { outputStream ->
+                            exportBackup(outputStream)
+                        }
+                        setLastAutoBackupDate(todayStr)
+                        return true
+                    }
+                }
+            }
+            val backupDir = context.getExternalFilesDir("backups") ?: File(context.filesDir, "backups")
+            if (!backupDir.exists()) {
+                backupDir.mkdirs()
+            }
+            backupDir.listFiles { f -> f.name.startsWith("path_auto_backup") && f.name != fileName }?.forEach { it.delete() }
+            val file = File(backupDir, fileName)
+            FileOutputStream(file).use { outputStream ->
+                exportBackup(outputStream)
+            }
+            setLastAutoBackupDate(todayStr)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun checkAndPerformAutoBackup() {
+        if (isAutoBackupEnabled()) {
+            val todayStr = getCurrentDateString()
+            if (getLastAutoBackupDate() != todayStr) {
+                performAutoBackup()
+            }
         }
     }
 

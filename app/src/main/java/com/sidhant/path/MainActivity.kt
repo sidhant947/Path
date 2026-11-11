@@ -188,7 +188,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         repository.handleDateChangeIfNeeded()
+        repository.checkAndPerformAutoBackup()
         trackingService?.updateWidget()
+        trackingService?.syncHealthConnect(force = true)
         lifecycleScope.launch(Dispatchers.IO) {
             PathWidget.updateWidget(applicationContext)
         }

@@ -83,6 +83,7 @@ class StepTrackingService : Service(), SensorEventListener {
     }
 
     private var lastThrottledUpdate = 0L
+    private var lastHealthConnectSync = 0L
     private var accumulatedDelta = 0
     private var pendingVehicleSteps = 0
     private var lastStepTime = 0L
@@ -91,6 +92,7 @@ class StepTrackingService : Service(), SensorEventListener {
         reloadMotionSensitivity()
         startForegroundServiceInternal()
         throttleUpdates(force = true)
+        repository.checkAndPerformAutoBackup()
         return START_STICKY
     }
 
@@ -106,7 +108,7 @@ class StepTrackingService : Service(), SensorEventListener {
             accumulatedDelta = 0
             updateNotification()
             updateWidget()
-            syncHealthConnect()
+            syncHealthConnect(force = force)
         }
     }
 
@@ -208,11 +210,15 @@ class StepTrackingService : Service(), SensorEventListener {
         }
     }
 
-    fun syncHealthConnect() {
+    fun syncHealthConnect(force: Boolean = false) {
         if (healthConnectManager.isNativeAndroid14Available() && repository.isHealthConnectEnabled()) {
-            val todaySteps = repository.getTodaySteps()
-            serviceScope.launch {
-                healthConnectManager.writeTodaySteps(todaySteps)
+            val now = System.currentTimeMillis()
+            if (force || now - lastHealthConnectSync >= 15 * 60 * 1000L) {
+                lastHealthConnectSync = now
+                val todaySteps = repository.getTodaySteps()
+                serviceScope.launch {
+                    healthConnectManager.writeTodaySteps(todaySteps)
+                }
             }
         }
     }

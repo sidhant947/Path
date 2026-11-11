@@ -9,6 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
@@ -25,12 +26,16 @@ val GreenAccent = Color(0xFF2ECC71)
 val OrangeAccent = Color(0xFFE67E22)
 
 fun getAccentColor(name: String): Color {
-    return when (name) {
-        "Pink" -> PinkAccent
-        "Blue" -> BlueAccent
-        "Green" -> GreenAccent
-        "Orange" -> OrangeAccent
-        else -> LimeAccent
+    return when (name.lowercase()) {
+        "pink" -> PinkAccent
+        "blue" -> BlueAccent
+        "green" -> GreenAccent
+        "orange" -> OrangeAccent
+        "lime" -> LimeAccent
+        else -> runCatching {
+            val hex = if (name.startsWith("#")) name else "#$name"
+            Color(android.graphics.Color.parseColor(hex))
+        }.getOrDefault(LimeAccent)
     }
 }
 
@@ -106,7 +111,7 @@ fun PathTheme(
     val baseScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val colorScheme = baseScheme.copy(
         primary = accentColor,
-        onPrimary = if (accentColor == BlueAccent) Color.White else Color.Black
+        onPrimary = if (accentColor == BlueAccent || accentColor.luminance() < 0.4f) Color.White else Color.Black
     )
 
     val view = LocalView.current

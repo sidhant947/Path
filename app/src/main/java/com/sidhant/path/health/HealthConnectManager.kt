@@ -5,16 +5,17 @@ import android.os.Build
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.StepsRecord
-import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.time.TimeRangeFilter
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZonedDateTime
 
 class HealthConnectManager(private val context: Context) {
 
-    private val prefs = context.getSharedPreferences("path_health_connect", Context.MODE_PRIVATE)
+    private val syncMutex = Mutex()
 
     fun isNativeAndroid14Available(): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -49,32 +50,34 @@ class HealthConnectManager(private val context: Context) {
         val now = Instant.now()
         val today = LocalDate.now(zoneId)
         val startOfDay = today.atStartOfDay(zoneId).toInstant()
+        val endOfDay = today.plusDays(1).atStartOfDay(zoneId).toInstant()
 
-        if (stepsCount <= 0 || startOfDay.isAfter(now)) return
+        if (stepsCount <= 0 || !now.isAfter(startOfDay)) return
+
+        val safeEndTime = if (now.isAfter(endOfDay)) endOfDay else now
 
         val record = StepsRecord(
             count = stepsCount.toLong(),
             startTime = startOfDay,
             startZoneOffset = zoneId.rules.getOffset(startOfDay),
-            endTime = now,
-            endZoneOffset = zoneId.rules.getOffset(now)
+            endTime = safeEndTime,
+            endZoneOffset = zoneId.rules.getOffset(safeEndTime),
+            metadata = Metadata(
+                clientRecordId = "path_steps_$today",
+                clientRecordVersion = System.currentTimeMillis()
+            )
         )
 
-        try {
-            val lastSyncDate = prefs.getString("last_sync_date", "")
-            val todayStr = today.toString()
-            if (lastSyncDate != todayStr) {
-                prefs.edit().putString("last_sync_date", todayStr).remove("last_record_id").apply()
-            }
-            val oldRecordId = prefs.getString("last_record_id", null)
-            if (oldRecordId != null) {
-                client.deleteRecords(StepsRecord::class, listOf(oldRecordId), emptyList())
-            }
-            val response = client.insertRecords(listOf(record))
-            val newRecordId = response.recordIdsList.firstOrNull()
-            if (newRecordId != null) {
-                prefs.edit().putString("last_record_id", newRecordId).apply()
-            }
-        } catch (_: Exception) {}
+        syncMutex.withLock {
+            try {
+                client.deleteRecords(
+                    StepsRecord::class,
+                    timeRangeFilter = TimeRangeFilter.between(startOfDay, endOfDay)
+                )
+            } catch (_: Exception) {}
+            try {
+                client.insertRecords(listOf(record))
+            } catch (_: Exception) {}
+        }
     }
 }
