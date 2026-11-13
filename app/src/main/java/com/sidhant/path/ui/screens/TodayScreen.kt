@@ -1,6 +1,11 @@
 package com.sidhant.path.ui.screens
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -30,6 +36,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -40,18 +47,41 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sidhant.path.ui.theme.SpaceGroteskFontFamily
 import com.sidhant.path.ui.theme.getAccentColor
+import kotlin.math.PI
+import kotlin.math.sin
 
-class BottomFillShape(private val progress: Float) : Shape {
+class WaveFillShape(
+    private val progress: Float,
+    private val phase: Float
+) : Shape {
     override fun createOutline(
         size: Size,
         layoutDirection: LayoutDirection,
         density: Density
     ): Outline {
-        val fillHeight = size.height * progress
-        val top = size.height - fillHeight
-        return Outline.Rectangle(
-            Rect(0f, top, size.width, size.height)
-        )
+        if (progress <= 0f) {
+            return Outline.Rectangle(Rect.Zero)
+        }
+        if (progress >= 1f) {
+            return Outline.Rectangle(Rect(0f, 0f, size.width, size.height))
+        }
+
+        val baseTop = size.height * (1f - progress)
+        val amplitude = with(density) { 10.dp.toPx() } * sin(progress * PI.toFloat())
+
+        val path = Path().apply {
+            moveTo(0f, size.height)
+            lineTo(0f, baseTop + amplitude * sin(phase))
+            for (i in 1..40) {
+                val x = size.width * (i / 40f)
+                val y = baseTop + amplitude * sin((i / 40f * 2f * PI.toFloat()) + phase)
+                lineTo(x, y)
+            }
+            lineTo(size.width, size.height)
+            close()
+        }
+
+        return Outline.Generic(path)
     }
 }
 
@@ -74,6 +104,16 @@ fun TodayScreen(
         animationSpec = tween(700),
         label = "progressAnim"
     )
+    val infiniteTransition = rememberInfiniteTransition(label = "waveTransition")
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2f * PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "wavePhase"
+    )
 
     Box(
         modifier = Modifier
@@ -82,9 +122,11 @@ fun TodayScreen(
     ) {
         Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .fillMaxHeight(animatedProgress)
+                .fillMaxSize()
+                .graphicsLayer {
+                    clip = true
+                    shape = WaveFillShape(animatedProgress, wavePhase)
+                }
                 .background(accentColor)
         )
 
@@ -104,7 +146,7 @@ fun TodayScreen(
                 .fillMaxSize()
                 .graphicsLayer {
                     clip = true
-                    shape = BottomFillShape(animatedProgress)
+                    shape = WaveFillShape(animatedProgress, wavePhase)
                 }
         ) {
             TodayForegroundContent(
@@ -139,6 +181,7 @@ private fun TodayForegroundContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .navigationBarsPadding()
             .padding(horizontal = 24.dp)
     ) {
         Spacer(modifier = Modifier.height(48.dp))
