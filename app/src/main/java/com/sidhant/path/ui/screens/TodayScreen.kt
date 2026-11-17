@@ -40,13 +40,16 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sidhant.path.R
 import com.sidhant.path.ui.theme.SpaceGroteskFontFamily
 import com.sidhant.path.ui.theme.getAccentColor
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -175,7 +178,7 @@ private fun TodayForegroundContent(
     onNavigateToStats: () -> Unit
 ) {
     val remaining = goal - todaySteps
-    val remainingLabel = if (remaining <= 0) "ACHIEVED" else "REMAINING"
+    val remainingLabel = if (remaining <= 0) stringResource(R.string.label_achieved) else stringResource(R.string.label_remaining)
     val remainingValue = if (remaining <= 0) formatNumber(todaySteps - goal) else formatNumber(remaining)
 
     Column(
@@ -195,7 +198,7 @@ private fun TodayForegroundContent(
                 modifier = Modifier.clickable { onOpenGoalSetup() }
             ) {
                 Text(
-                    text = "GOAL",
+                    text = stringResource(R.string.label_goal),
                     color = textColor,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -247,7 +250,7 @@ private fun TodayForegroundContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Daily Steps",
+                text = stringResource(R.string.label_daily_steps),
                 color = textColor,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Medium,
@@ -263,20 +266,20 @@ private fun TodayForegroundContent(
         ) {
             MetricItem(
                 icon = Icons.Rounded.Straighten,
-                value = "${String.format("%.2f", distanceKm)} km",
-                label = "DISTANCE",
+                value = stringResource(R.string.format_km, String.format(Locale.getDefault(), "%.2f", distanceKm)),
+                label = stringResource(R.string.label_distance),
                 color = textColor
             )
             MetricItem(
                 icon = Icons.Rounded.LocalFireDepartment,
-                value = "${calories.toInt()} kcal",
-                label = "CALORIES",
+                value = stringResource(R.string.format_kcal, calories.toInt()),
+                label = stringResource(R.string.label_calories),
                 color = textColor
             )
             MetricItem(
                 icon = Icons.Rounded.Timer,
-                value = "${activeMinutes.toInt()}m",
-                label = "ACTIVE",
+                value = stringResource(R.string.format_active_minutes, activeMinutes.toInt()),
+                label = stringResource(R.string.label_active),
                 color = textColor
             )
         }
@@ -296,7 +299,7 @@ private fun TodayForegroundContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Today",
+                    text = stringResource(R.string.tab_today),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SpaceGroteskFontFamily,
@@ -310,7 +313,7 @@ private fun TodayForegroundContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Stats",
+                    text = stringResource(R.string.tab_stats),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SpaceGroteskFontFamily,
@@ -356,5 +359,5 @@ private fun MetricItem(
 }
 
 private fun formatNumber(num: Int): String {
-    return String.format("%,d", num)
+    return String.format(Locale.getDefault(), "%,d", num)
 }

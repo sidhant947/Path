@@ -47,17 +47,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sidhant.path.R
 import com.sidhant.path.ui.theme.getAccentColor
 
 data class OnboardingStepData(
     val icon: ImageVector,
-    val title: String,
-    val description: String,
-    val buttonLabel: String
+    val titleRes: Int,
+    val descriptionRes: Int,
+    val buttonLabelRes: Int
 )
 
 @Composable
@@ -131,21 +133,21 @@ fun OnboardingScreen(
     val steps = listOf(
         OnboardingStepData(
             icon = Icons.Rounded.DirectionsRun,
-            title = "Activity Access",
-            description = "Path needs activity recognition to track your steps accurately and help you reach your fitness goals.",
-            buttonLabel = "GRANT ACCESS"
+            titleRes = R.string.onboarding_activity_title,
+            descriptionRes = R.string.onboarding_activity_desc,
+            buttonLabelRes = R.string.btn_grant_access
         ),
         OnboardingStepData(
             icon = Icons.Rounded.BatterySaver,
-            title = "Unrestricted Access",
-            description = "To track steps even when the app is closed, please disable battery optimization for Path.",
-            buttonLabel = "REMOVE RESTRICTIONS"
+            titleRes = R.string.onboarding_battery_title,
+            descriptionRes = R.string.onboarding_battery_desc,
+            buttonLabelRes = R.string.btn_remove_restrictions
         ),
         OnboardingStepData(
             icon = Icons.Rounded.NotificationsActive,
-            title = "Stay Updated",
-            description = "Get real-time step count updates in your notification bar so you always know your progress.",
-            buttonLabel = "ENABLE NOTIFICATIONS"
+            titleRes = R.string.onboarding_notification_title,
+            descriptionRes = R.string.onboarding_notification_desc,
+            buttonLabelRes = R.string.btn_enable_notifications
         )
     )
 
@@ -202,7 +204,7 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             Text(
-                text = step.title,
+                text = stringResource(step.titleRes),
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -212,7 +214,7 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = step.description,
+                text = stringResource(step.descriptionRes),
                 fontSize = 16.sp,
                 color = Color.Gray,
                 textAlign = TextAlign.Center,
@@ -242,7 +244,7 @@ fun OnboardingScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Granted",
+                        text = stringResource(R.string.granted),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -301,7 +303,7 @@ fun OnboardingScreen(
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
                 Text(
-                    text = if (isCurrentGranted) "CONTINUE" else step.buttonLabel,
+                    text = if (isCurrentGranted) stringResource(R.string.btn_continue) else stringResource(step.buttonLabelRes),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp

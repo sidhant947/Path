@@ -51,12 +51,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sidhant.path.R
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -125,7 +127,7 @@ fun SettingsScreen(
             } catch (e: Exception) {
                 false
             }
-            val msg = if (success) "Backup exported successfully" else "Failed to export backup"
+            val msg = if (success) context.getString(R.string.toast_backup_exported) else context.getString(R.string.toast_backup_export_failed)
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         }
     }
@@ -172,9 +174,9 @@ fun SettingsScreen(
                 autoBackupDirUri = repository.getAutoBackupDirectoryUri()
                 lastAutoBackupDate = repository.getLastAutoBackupDate()
                 onThemeOrAccentChanged()
-                Toast.makeText(context, "Backup restored successfully", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_backup_restored), Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Failed to restore backup", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_backup_restore_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -203,7 +205,7 @@ fun SettingsScreen(
                 )
             }
             Text(
-                text = "SETTINGS",
+                text = stringResource(R.string.title_settings),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SpaceGroteskFontFamily,
@@ -219,7 +221,7 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
-            SectionHeader("APPEARANCE", Icons.Rounded.Palette, currentAccentColor)
+            SectionHeader(stringResource(R.string.section_appearance), Icons.Rounded.Palette, currentAccentColor)
             Spacer(modifier = Modifier.height(12.dp))
             Box(
                 modifier = Modifier
@@ -229,7 +231,7 @@ fun SettingsScreen(
             ) {
                 Column {
                     Text(
-                        text = "ACCENT COLOR",
+                        text = stringResource(R.string.label_accent_color),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -276,7 +278,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "CUSTOM HEX COLOR",
+                        text = stringResource(R.string.label_custom_hex_color),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -331,7 +333,7 @@ fun SettingsScreen(
                                 ) {
                                     if (hexInput.isEmpty()) {
                                         Text(
-                                            text = "#RRGGBB",
+                                            text = stringResource(R.string.placeholder_hex),
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
                                             fontFamily = SpaceGroteskFontFamily,
@@ -380,7 +382,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
-                        text = "THEME MODE",
+                        text = stringResource(R.string.label_theme_mode),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -389,7 +391,11 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        listOf("system", "light", "dark").forEach { mode ->
+                        listOf(
+                            "system" to R.string.theme_system,
+                            "light" to R.string.theme_light,
+                            "dark" to R.string.theme_dark
+                        ).forEach { (mode, stringRes) ->
                             val selected = selectedTheme == mode
                             Box(
                                 modifier = Modifier
@@ -408,7 +414,7 @@ fun SettingsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = mode.uppercase(),
+                                    text = stringResource(stringRes),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SpaceGroteskFontFamily,
@@ -422,7 +428,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            SectionHeader("DAILY TARGETS", Icons.Rounded.Radar, currentAccentColor)
+            SectionHeader(stringResource(R.string.section_daily_targets), Icons.Rounded.Radar, currentAccentColor)
             Spacer(modifier = Modifier.height(12.dp))
             Box(
                 modifier = Modifier
@@ -437,7 +443,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "FLEXIBLE DAILY GOALS",
+                            text = stringResource(R.string.label_flexible_daily_goals),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = SpaceGroteskFontFamily,
@@ -458,7 +464,7 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 InputField(
-                                    label = "WEEKDAY GOAL",
+                                    label = stringResource(R.string.label_weekday_goal),
                                     value = weekdayGoalText,
                                     onValueChange = {
                                         weekdayGoalText = it
@@ -468,7 +474,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 InputField(
-                                    label = "WEEKEND GOAL",
+                                    label = stringResource(R.string.label_weekend_goal),
                                     value = weekendGoalText,
                                     onValueChange = {
                                         weekendGoalText = it
@@ -484,7 +490,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            SectionHeader("MOTION CALIBRATION", Icons.Rounded.Tune, currentAccentColor)
+            SectionHeader(stringResource(R.string.section_motion_calibration), Icons.Rounded.Tune, currentAccentColor)
             Spacer(modifier = Modifier.height(12.dp))
             Box(
                 modifier = Modifier
@@ -494,7 +500,7 @@ fun SettingsScreen(
             ) {
                 Column {
                     Text(
-                        text = "VEHICLE ACCURACY SENSITIVITY",
+                        text = stringResource(R.string.label_vehicle_accuracy_sensitivity),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -502,7 +508,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Off disables vehicle filtering. Low sensitivity counts more active steps. High sensitivity filters more vehicle movements.",
+                        text = stringResource(R.string.desc_vehicle_accuracy_sensitivity),
                         fontSize = 12.sp,
                         fontFamily = SpaceGroteskFontFamily,
                         color = Color.Gray,
@@ -510,7 +516,12 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        listOf("off", "low", "medium", "high").forEach { sensitivity ->
+                        listOf(
+                            "off" to R.string.sensitivity_off,
+                            "low" to R.string.sensitivity_low,
+                            "medium" to R.string.sensitivity_medium,
+                            "high" to R.string.sensitivity_high
+                        ).forEach { (sensitivity, stringRes) ->
                             val selected = motionSensitivity == sensitivity
                             Box(
                                 modifier = Modifier
@@ -529,7 +540,7 @@ fun SettingsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = sensitivity.uppercase(),
+                                    text = stringResource(stringRes),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SpaceGroteskFontFamily,
@@ -543,7 +554,7 @@ fun SettingsScreen(
 
             if (isHcAvailable) {
                 Spacer(modifier = Modifier.height(28.dp))
-                SectionHeader("HEALTH CONNECT", Icons.Rounded.Favorite, currentAccentColor)
+                SectionHeader(stringResource(R.string.section_health_connect), Icons.Rounded.Favorite, currentAccentColor)
                 Spacer(modifier = Modifier.height(12.dp))
                 Box(
                     modifier = Modifier
@@ -559,7 +570,7 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "SYNC TO HEALTH CONNECT",
+                                    text = stringResource(R.string.label_sync_health_connect),
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = SpaceGroteskFontFamily,
@@ -567,7 +578,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "AOSP Native sync (Android 14+). Requires no Google Play Services.",
+                                    text = stringResource(R.string.desc_sync_health_connect),
                                     fontSize = 12.sp,
                                     fontFamily = SpaceGroteskFontFamily,
                                     color = Color.Gray,
@@ -602,7 +613,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            SectionHeader("BACKUP & RESTORE", Icons.Rounded.Backup, currentAccentColor)
+            SectionHeader(stringResource(R.string.section_backup_restore), Icons.Rounded.Backup, currentAccentColor)
             Spacer(modifier = Modifier.height(12.dp))
             Box(
                 modifier = Modifier
@@ -618,7 +629,7 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "DAILY AUTO BACKUP",
+                                text = stringResource(R.string.label_daily_auto_backup),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -627,9 +638,9 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = if (autoBackupEnabled && lastAutoBackupDate.isNotEmpty()) {
-                                    "Automatically backs up once per day. Last: $lastAutoBackupDate"
+                                    stringResource(R.string.desc_daily_auto_backup_last, lastAutoBackupDate)
                                 } else {
-                                    "Automatically save backup to device storage once per day."
+                                    stringResource(R.string.desc_daily_auto_backup)
                                 },
                                 fontSize = 12.sp,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -665,9 +676,9 @@ fun SettingsScreen(
                         if (autoBackupDirUri.isNotEmpty()) {
                             runCatching {
                                 DocumentFile.fromTreeUri(context, Uri.parse(autoBackupDirUri))?.name
-                            }.getOrNull() ?: "Custom Folder"
+                            }.getOrNull() ?: context.getString(R.string.folder_custom)
                         } else {
-                            "Select folder..."
+                            context.getString(R.string.folder_select)
                         }
                     }
 
@@ -682,7 +693,7 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "BACKUP DIRECTORY",
+                                text = stringResource(R.string.label_backup_directory),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -709,7 +720,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
-                        text = "MANUAL BACKUP",
+                        text = stringResource(R.string.label_manual_backup),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -717,7 +728,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Export your step history, personal records, and settings to a JSON file, or restore from a previous backup.",
+                        text = stringResource(R.string.desc_manual_backup),
                         fontSize = 12.sp,
                         fontFamily = SpaceGroteskFontFamily,
                         color = Color.Gray,
@@ -733,7 +744,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = "EXPORT",
+                                text = stringResource(R.string.btn_export),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -750,7 +761,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = "IMPORT",
+                                text = stringResource(R.string.btn_import),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -764,7 +775,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            SectionHeader("BACKGROUND DIAGNOSTICS", Icons.Rounded.DeveloperMode, currentAccentColor)
+            SectionHeader(stringResource(R.string.section_background_diagnostics), Icons.Rounded.DeveloperMode, currentAccentColor)
             Spacer(modifier = Modifier.height(12.dp))
             Box(
                 modifier = Modifier
@@ -774,7 +785,7 @@ fun SettingsScreen(
             ) {
                 Column {
                     Text(
-                        text = "AGGRESSIVE BATTERY SAVING",
+                        text = stringResource(R.string.label_aggressive_battery_saving),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -782,17 +793,33 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Android manufacturers frequently shut down background pedometers. Follow these steps for your device to ensure continuous tracking:",
+                        text = stringResource(R.string.desc_aggressive_battery_saving),
                         fontSize = 12.sp,
                         fontFamily = SpaceGroteskFontFamily,
                         color = Color.Gray,
                         lineHeight = 16.sp
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    DiagnosticItem("Google Pixel", "Settings > Apps > Path > Battery > Select 'Unrestricted'.", primaryTextColor)
-                    DiagnosticItem("Samsung", "Settings > Battery > Background usage limits > Ensure Path is not in sleeping apps list.", primaryTextColor)
-                    DiagnosticItem("Xiaomi / Redmi", "App Info > Battery Saver > Select 'No restrictions'.", primaryTextColor)
-                    DiagnosticItem("OnePlus", "Settings > Apps > App management > Path > Battery usage > Enable 'Allow background activity'.", primaryTextColor)
+                    DiagnosticItem(
+                        stringResource(R.string.device_google_pixel),
+                        stringResource(R.string.desc_google_pixel),
+                        primaryTextColor
+                    )
+                    DiagnosticItem(
+                        stringResource(R.string.device_samsung),
+                        stringResource(R.string.desc_samsung),
+                        primaryTextColor
+                    )
+                    DiagnosticItem(
+                        stringResource(R.string.device_xiaomi),
+                        stringResource(R.string.desc_xiaomi),
+                        primaryTextColor
+                    )
+                    DiagnosticItem(
+                        stringResource(R.string.device_oneplus),
+                        stringResource(R.string.desc_oneplus),
+                        primaryTextColor
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedButton(
                         onClick = {
@@ -803,7 +830,7 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = "DONTKILLMYAPP.COM GUIDE",
+                            text = stringResource(R.string.btn_dontkillmyapp_guide),
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             fontFamily = SpaceGroteskFontFamily,

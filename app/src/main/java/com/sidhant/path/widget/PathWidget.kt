@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -38,6 +39,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.sidhant.path.MainActivity
+import com.sidhant.path.R
 import com.sidhant.path.data.StepRepository
 import com.sidhant.path.ui.theme.getAccentColor
 import kotlinx.coroutines.CoroutineScope
@@ -71,9 +73,10 @@ class PathWidget : GlanceAppWidget() {
         goal: Int,
         accentColor: Color
     ) {
+        val context = LocalContext.current
         val progress = if (goal > 0) (todaySteps.toFloat() / goal.toFloat()).coerceIn(0f, 1f) else 0f
         val remaining = goal - todaySteps
-        val remainingText = if (remaining <= 0) "ACHIEVED" else "${formatNumber(remaining)} REMAINING"
+        val remainingText = if (remaining <= 0) context.getString(R.string.label_achieved) else context.getString(R.string.widget_remaining, formatNumber(remaining))
 
         val size = LocalSize.current
         val fillHeight = (size.height.value * progress).dp
@@ -111,7 +114,7 @@ class PathWidget : GlanceAppWidget() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "GOAL ${formatNumber(goal)}",
+                        text = context.getString(R.string.widget_goal, formatNumber(goal)),
                         style = TextStyle(
                             color = ColorProvider(headerTextColor),
                             fontSize = 11.sp,
@@ -143,7 +146,7 @@ class PathWidget : GlanceAppWidget() {
                 Spacer(modifier = GlanceModifier.height(2.dp))
 
                 Text(
-                    text = "Daily Steps",
+                    text = context.getString(R.string.label_daily_steps),
                     style = TextStyle(
                         color = ColorProvider(subTextColor),
                         fontSize = 13.sp,
@@ -157,7 +160,7 @@ class PathWidget : GlanceAppWidget() {
     }
 
     private fun formatNumber(num: Int): String {
-        return String.format(Locale.US, "%,d", num)
+        return String.format(Locale.getDefault(), "%,d", num)
     }
 
     companion object {

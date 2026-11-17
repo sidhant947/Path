@@ -232,11 +232,11 @@ class StepTrackingService : Service(), SensorEventListener {
         val content: String
 
         if (steps >= goal) {
-            title = "Goal Achieved! 🎉"
-            content = "Amazing! ${formatNumber(steps)} steps today!"
+            title = getString(R.string.notif_goal_achieved_title)
+            content = getString(R.string.notif_goal_achieved_content, formatNumber(steps))
         } else {
-            title = "Path - Step Tracker"
-            content = "${formatNumber(steps)} / ${formatNumber(goal)} steps ($progress%)"
+            title = getString(R.string.notif_tracking_title)
+            content = getString(R.string.notif_tracking_content, formatNumber(steps), formatNumber(goal), progress)
         }
 
         val intent = Intent(this, MainActivity::class.java)
@@ -259,7 +259,7 @@ class StepTrackingService : Service(), SensorEventListener {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Step Tracking Service",
+                getString(R.string.notif_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -268,7 +268,7 @@ class StepTrackingService : Service(), SensorEventListener {
     }
 
     private fun formatNumber(num: Int): String {
-        return String.format("%,d", num)
+        return String.format(java.util.Locale.getDefault(), "%,d", num)
     }
 
     override fun onDestroy() {

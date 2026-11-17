@@ -28,11 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sidhant.path.R
 import com.sidhant.path.ui.theme.getAccentColor
 
 @Composable
@@ -84,7 +86,7 @@ fun WelcomeScreen(
             Spacer(modifier = Modifier.height(40.dp))
 
             Text(
-                text = "Welcome to Path",
+                text = stringResource(R.string.welcome_title),
                 fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -95,7 +97,7 @@ fun WelcomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Your personal step tracker that helps you reach your daily goals and stay active.",
+                text = stringResource(R.string.welcome_description),
                 fontSize = 17.sp,
                 color = Color.Gray,
                 textAlign = TextAlign.Center,
@@ -117,7 +119,7 @@ fun WelcomeScreen(
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
                 Text(
-                    text = "GET STARTED",
+                    text = stringResource(R.string.btn_get_started),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp

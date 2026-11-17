@@ -24,12 +24,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sidhant.path.R
 
 @Composable
 fun GoalSetupScreen(
@@ -54,7 +56,7 @@ fun GoalSetupScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             Text(
-                text = "Daily Goal",
+                text = stringResource(R.string.goal_setup_title),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.Gray
@@ -102,7 +104,7 @@ fun GoalSetupScreen(
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
                 Text(
-                    text = "Update goal",
+                    text = stringResource(R.string.btn_update_goal),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )

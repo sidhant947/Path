@@ -1,3 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Path</string>
+    <string name="app_name" translatable="false">Path</string>
+
+    <string name="tab_today">Today</string>
+    <string name="tab_stats">Stats</string>
+    <string name="label_achieved">ACHIEVED</string>
+    <string name="label_remaining">REMAINING</string>
+    <string name="label_goal">GOAL</string>
+    <string name="label_daily_steps">Daily Steps</string>
+    <string name="label_distance">DISTANCE</string>
+    <string name="label_calories">CALORIES</string>
+    <string name="label_active">ACTIVE</string>
+    <string name="format_km">%s km</string>
+    <string name="format_kcal">%d kcal</string>
+    <string name="format_active_minutes">%dm</string>
+
+    <string name="welcome_title">Welcome to Path</string>
+    <string name="welcome_description">Your personal step tracker that helps you reach your daily goals and stay active.</string>
+    <string name="btn_get_started">GET STARTED</string>
+
+    <string name="onboarding_activity_title">Activity Access</string>
+    <string name="onboarding_activity_desc">Path needs activity recognition to track your steps accurately and help you reach your fitness goals.</string>
+    <string name="btn_grant_access">GRANT ACCESS</string>
+    <string name="onboarding_battery_title">Unrestricted Access</string>
+    <string name="onboarding_battery_desc">To track steps even when the app is closed, please disable battery optimization for Path.</string>
+    <string name="btn_remove_restrictions">REMOVE RESTRICTIONS</string>
+    <string name="onboarding_notification_title">Stay Updated</string>
+    <string name="onboarding_notification_desc">Get real-time step count updates in your notification bar so you always know your progress.</string>
+    <string name="btn_enable_notifications">ENABLE NOTIFICATIONS</string>
+    <string name="granted">Granted</string>
+    <string name="btn_continue">CONTINUE</string>
+
+    <string name="goal_setup_title">Daily Goal</string>
+    <string name="btn_update_goal">Update goal</string>
+
+    <string name="label_streak">STREAK</string>
+    <string name="format_day_streak">%d DAY STREAK</string>
+    <string name="encouragement_goal_smashed">Amazing work! Goal smashed.</string>
+    <string name="encouragement_almost_there">Almost there! Keep pushing.</string>
+    <string name="encouragement_keep_walking">Go for a walk! You can do it.</string>
+    <string name="btn_buy_me_a_coffee">Buy Me a Coffee</string>
+    <string name="label_activity">ACTIVITY</string>
+    <string name="format_activity_goal">Goal: %s</string>
+    <string name="day_initial_today">T</string>
+    <string name="label_today_breakdown">TODAY BREAKDOWN</string>
+    <string name="format_walk_breakdown">Walk: %1$s (%2$d%%)</string>
+    <string name="format_run_breakdown">Run: %1$s (%2$d%%)</string>
+    <string name="label_hourly_distribution">HOURLY DISTRIBUTION</string>
+    <string name="time_night">NIGHT</string>
+    <string name="time_morning">MORNING</string>
+    <string name="time_afternoon">AFTERNOON</string>
+    <string name="time_evening">EVENING</string>
+    <string name="label_personal_records">PERSONAL RECORDS &amp; BADGES</string>
+    <string name="label_all_time_best">ALL-TIME BEST</string>
+    <string name="label_best_streak">BEST STREAK</string>
+    <string name="format_days_count">%d DAYS</string>
+    <string name="label_active_days">Active Days</string>
+    <string name="label_lifetime_steps">LIFETIME STEPS</string>
+    <string name="label_total_distance">TOTAL DISTANCE</string>
+    <string name="label_today_caps">TODAY</string>
+
+    <string name="title_settings">SETTINGS</string>
+    <string name="section_appearance">APPEARANCE</string>
+    <string name="label_accent_color">ACCENT COLOR</string>
+    <string name="label_custom_hex_color">CUSTOM HEX COLOR</string>
+    <string name="placeholder_hex">#RRGGBB</string>
+    <string name="label_theme_mode">THEME MODE</string>
+    <string name="theme_system">SYSTEM</string>
+    <string name="theme_light">LIGHT</string>
+    <string name="theme_dark">DARK</string>
+    <string name="section_daily_targets">DAILY TARGETS</string>
+    <string name="label_flexible_daily_goals">FLEXIBLE DAILY GOALS</string>
+    <string name="label_weekday_goal">WEEKDAY GOAL</string>
+    <string name="label_weekend_goal">WEEKEND GOAL</string>
+    <string name="section_motion_calibration">MOTION CALIBRATION</string>
+    <string name="label_vehicle_accuracy_sensitivity">VEHICLE ACCURACY SENSITIVITY</string>
+    <string name="desc_vehicle_accuracy_sensitivity">Off disables vehicle filtering. Low sensitivity counts more active steps. High sensitivity filters more vehicle movements.</string>
+    <string name="sensitivity_off">OFF</string>
+    <string name="sensitivity_low">LOW</string>
+    <string name="sensitivity_medium">MEDIUM</string>
+    <string name="sensitivity_high">HIGH</string>
+    <string name="section_health_connect">HEALTH CONNECT</string>
+    <string name="label_sync_health_connect">SYNC TO HEALTH CONNECT</string>
+    <string name="desc_sync_health_connect">AOSP Native sync (Android 14+). Requires no Google Play Services.</string>
+    <string name="section_backup_restore">BACKUP &amp; RESTORE</string>
+    <string name="label_daily_auto_backup">DAILY AUTO BACKUP</string>
+    <string name="desc_daily_auto_backup">Automatically save backup to device storage once per day.</string>
+    <string name="desc_daily_auto_backup_last">Automatically backs up once per day. Last: %s</string>
+    <string name="folder_custom">Custom Folder</string>
+    <string name="folder_select">Select folder...</string>
+    <string name="label_backup_directory">BACKUP DIRECTORY</string>
+    <string name="label_manual_backup">MANUAL BACKUP</string>
+    <string name="desc_manual_backup">Export your step history, personal records, and settings to a JSON file, or restore from a previous backup.</string>
+    <string name="btn_export">EXPORT</string>
+    <string name="btn_import">IMPORT</string>
+    <string name="section_background_diagnostics">BACKGROUND DIAGNOSTICS</string>
+    <string name="label_aggressive_battery_saving">AGGRESSIVE BATTERY SAVING</string>
+    <string name="desc_aggressive_battery_saving">Android manufacturers frequently shut down background pedometers. Follow these steps for your device to ensure continuous tracking:</string>
+    <string name="device_google_pixel">Google Pixel</string>
+    <string name="desc_google_pixel">Settings &gt; Apps &gt; Path &gt; Battery &gt; Select \'Unrestricted\'.</string>
+    <string name="device_samsung">Samsung</string>
+    <string name="desc_samsung">Settings &gt; Battery &gt; Background usage limits &gt; Ensure Path is not in sleeping apps list.</string>
+    <string name="device_xiaomi">Xiaomi / Redmi</string>
+    <string name="desc_xiaomi">App Info &gt; Battery Saver &gt; Select \'No restrictions\'.</string>
+    <string name="device_oneplus">OnePlus</string>
+    <string name="desc_oneplus">Settings &gt; Apps &gt; App management &gt; Path &gt; Battery usage &gt; Enable \'Allow background activity\'.</string>
+    <string name="btn_dontkillmyapp_guide">DONTKILLMYAPP.COM GUIDE</string>
+    <string name="toast_backup_exported">Backup exported successfully</string>
+    <string name="toast_backup_export_failed">Failed to export backup</string>
+    <string name="toast_backup_restored">Backup restored successfully</string>
+    <string name="toast_backup_restore_failed">Failed to restore backup</string>
+
+    <string name="notif_goal_achieved_title">Goal Achieved! 🎉</string>
+    <string name="notif_goal_achieved_content">Amazing! %s steps today!</string>
+    <string name="notif_tracking_title">Path - Step Tracker</string>
+    <string name="notif_tracking_content">%1$s / %2$s steps (%3$d%%)</string>
+    <string name="notif_channel_name">Step Tracking Service</string>
+
+    <string name="widget_initial_text">Path Steps</string>
+    <string name="widget_goal">GOAL %s</string>
+    <string name="widget_remaining">%s REMAINING</string>
 </resources>

@@ -45,9 +45,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sidhant.path.R
 import com.sidhant.path.data.DailyStepRecord
 import com.sidhant.path.ui.theme.SpaceGroteskFontFamily
 import com.sidhant.path.ui.theme.getAccentColor
@@ -186,7 +188,7 @@ fun StatsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Today",
+                    text = stringResource(R.string.tab_today),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SpaceGroteskFontFamily,
@@ -199,7 +201,7 @@ fun StatsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Stats",
+                    text = stringResource(R.string.tab_stats),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SpaceGroteskFontFamily,
@@ -224,7 +226,7 @@ private fun HeaderRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "STREAK",
+                text = stringResource(R.string.label_streak),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SpaceGroteskFontFamily,
@@ -249,7 +251,7 @@ private fun HeaderRow(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "$streak DAY STREAK",
+                text = stringResource(R.string.format_day_streak, streak),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SpaceGroteskFontFamily,
@@ -276,9 +278,9 @@ private fun EncouragementSection(
     accentColor: Color
 ) {
     val message = when {
-        todaySteps >= goal -> "Amazing work! Goal smashed."
-        todaySteps >= goal * 0.7 -> "Almost there! Keep pushing."
-        else -> "Go for a walk! You can do it."
+        todaySteps >= goal -> stringResource(R.string.encouragement_goal_smashed)
+        todaySteps >= goal * 0.7 -> stringResource(R.string.encouragement_almost_there)
+        else -> stringResource(R.string.encouragement_keep_walking)
     }
 
     Box(
@@ -337,7 +339,7 @@ private fun BuyMeACoffeeButton(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "Buy Me a Coffee",
+            text = stringResource(R.string.btn_buy_me_a_coffee),
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = SpaceGroteskFontFamily,
@@ -373,7 +375,7 @@ private fun ActivityChartSection(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "ACTIVITY",
+                    text = stringResource(R.string.label_activity),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SpaceGroteskFontFamily,
@@ -381,7 +383,7 @@ private fun ActivityChartSection(
                     color = Color.Gray
                 )
                 Text(
-                    text = "Goal: ${formatNumber(goal)}",
+                    text = stringResource(R.string.format_activity_goal, formatNumber(goal)),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = SpaceGroteskFontFamily,
@@ -431,7 +433,7 @@ private fun ActivityChartSection(
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        val dayLabel = if (isToday) "T" else SimpleDateFormat("E", Locale.US).format(record.date).take(1)
+                        val dayLabel = if (isToday) stringResource(R.string.day_initial_today) else SimpleDateFormat("E", Locale.getDefault()).format(record.date).take(1)
                         Text(
                             text = dayLabel,
                             fontSize = 12.sp,
@@ -466,7 +468,7 @@ private fun BreakdownSection(
     ) {
         Column {
             Text(
-                text = "TODAY BREAKDOWN",
+                text = stringResource(R.string.label_today_breakdown),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SpaceGroteskFontFamily,
@@ -511,7 +513,7 @@ private fun BreakdownSection(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Walk: ${formatNumber(walkingSteps)} (${(walkPercent * 100).toInt()}%)",
+                        text = stringResource(R.string.format_walk_breakdown, formatNumber(walkingSteps), (walkPercent * 100).toInt()),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -527,7 +529,7 @@ private fun BreakdownSection(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Run: ${formatNumber(runningSteps)} (${(runPercent * 100).toInt()}%)",
+                        text = stringResource(R.string.format_run_breakdown, formatNumber(runningSteps), (runPercent * 100).toInt()),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -577,7 +579,7 @@ private fun HourlySection(
     ) {
         Column {
             Text(
-                text = "HOURLY DISTRIBUTION",
+                text = stringResource(R.string.label_hourly_distribution),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SpaceGroteskFontFamily,
@@ -592,10 +594,10 @@ private fun HourlySection(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.Bottom
             ) {
-                HourlyBar("NIGHT", night, maxSteps, Icons.Rounded.NightsStay, textColor, accentColor)
-                HourlyBar("MORNING", morning, maxSteps, Icons.Rounded.WbSunny, textColor, accentColor)
-                HourlyBar("AFTERNOON", afternoon, maxSteps, Icons.Rounded.WbTwilight, textColor, accentColor)
-                HourlyBar("EVENING", evening, maxSteps, Icons.Rounded.DarkMode, textColor, accentColor)
+                HourlyBar(stringResource(R.string.time_night), night, maxSteps, Icons.Rounded.NightsStay, textColor, accentColor)
+                HourlyBar(stringResource(R.string.time_morning), morning, maxSteps, Icons.Rounded.WbSunny, textColor, accentColor)
+                HourlyBar(stringResource(R.string.time_afternoon), afternoon, maxSteps, Icons.Rounded.WbTwilight, textColor, accentColor)
+                HourlyBar(stringResource(R.string.time_evening), evening, maxSteps, Icons.Rounded.DarkMode, textColor, accentColor)
             }
         }
     }
@@ -673,7 +675,7 @@ private fun AchievementsSection(
     ) {
         Column {
             Text(
-                text = "PERSONAL RECORDS & BADGES",
+                text = stringResource(R.string.label_personal_records),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = SpaceGroteskFontFamily,
@@ -683,7 +685,7 @@ private fun AchievementsSection(
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
                 AchievementCard(
-                    label = "ALL-TIME BEST",
+                    label = stringResource(R.string.label_all_time_best),
                     value = formatNumber(pbSteps),
                     sub = pbStepsDate,
                     icon = Icons.Rounded.EmojiEvents,
@@ -693,9 +695,9 @@ private fun AchievementsSection(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 AchievementCard(
-                    label = "BEST STREAK",
-                    value = "$pbStreak DAYS",
-                    sub = "Active Days",
+                    label = stringResource(R.string.label_best_streak),
+                    value = stringResource(R.string.format_days_count, pbStreak),
+                    sub = stringResource(R.string.label_active_days),
                     icon = Icons.Rounded.LocalFireDepartment,
                     iconTint = Color(0xFFFF9800),
                     textColor = textColor,
@@ -705,7 +707,7 @@ private fun AchievementsSection(
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
                 AchievementCard(
-                    label = "LIFETIME STEPS",
+                    label = stringResource(R.string.label_lifetime_steps),
                     value = formatNumber(lifetimeSteps),
                     sub = "",
                     icon = Icons.Rounded.StackedLineChart,
@@ -715,8 +717,8 @@ private fun AchievementsSection(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 AchievementCard(
-                    label = "TOTAL DISTANCE",
-                    value = "${String.format("%.1f", totalDistanceKm)} km",
+                    label = stringResource(R.string.label_total_distance),
+                    value = stringResource(R.string.format_km, String.format(Locale.getDefault(), "%.1f", totalDistanceKm)),
                     sub = "",
                     icon = Icons.Rounded.Map,
                     iconTint = Color(0xFF2196F3),
@@ -786,8 +788,8 @@ private fun HistoryListSection(
     val todayRecord = DailyStepRecord("Today", Date(), todaySteps)
     val displayRecords = (listOf(todayRecord) + history).take(7)
 
-    val sdfDay = SimpleDateFormat("EEEE", Locale.US)
-    val sdfDate = SimpleDateFormat("dd MMMM", Locale.US)
+    val sdfDay = SimpleDateFormat("EEEE", Locale.getDefault())
+    val sdfDate = SimpleDateFormat("dd MMMM", Locale.getDefault())
 
     Column {
         displayRecords.forEachIndexed { index, record ->
@@ -801,7 +803,7 @@ private fun HistoryListSection(
             ) {
                 Column {
                     Text(
-                        text = if (isToday) "TODAY" else sdfDay.format(record.date).uppercase(Locale.US),
+                        text = if (isToday) stringResource(R.string.label_today_caps) else sdfDay.format(record.date).uppercase(Locale.getDefault()),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SpaceGroteskFontFamily,
@@ -829,5 +831,5 @@ private fun HistoryListSection(
 }
 
 private fun formatNumber(num: Int): String {
-    return String.format("%,d", num)
+    return String.format(Locale.getDefault(), "%,d", num)
 }
