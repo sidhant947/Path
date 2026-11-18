@@ -211,13 +211,21 @@ class StepTrackingService : Service(), SensorEventListener {
     }
 
     fun syncHealthConnect(force: Boolean = false) {
-        if (healthConnectManager.isNativeAndroid14Available() && repository.isHealthConnectEnabled()) {
+        val hcAvailable = healthConnectManager.isNativeAndroid14Available()
+        val syncSteps = repository.isHealthConnectEnabled()
+        val syncCalories = repository.isHealthConnectCaloriesEnabled()
+        if (hcAvailable && (syncSteps || syncCalories)) {
             val now = System.currentTimeMillis()
             if (force || now - lastHealthConnectSync >= 15 * 60 * 1000L) {
                 lastHealthConnectSync = now
                 val todaySteps = repository.getTodaySteps()
                 serviceScope.launch {
-                    healthConnectManager.writeTodaySteps(todaySteps)
+                    if (syncSteps) {
+                        healthConnectManager.writeTodaySteps(todaySteps)
+                    }
+                    if (syncCalories) {
+                        healthConnectManager.writeTodayCalories(repository.getCalories(todaySteps))
+                    }
                 }
             }
         }

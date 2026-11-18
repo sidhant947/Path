@@ -31,6 +31,9 @@ class StepRepository(private val context: Context) {
     fun isHealthConnectEnabled(): Boolean = prefs.getBoolean("health_connect_enabled", false)
     fun setHealthConnectEnabled(enabled: Boolean) = prefs.edit().putBoolean("health_connect_enabled", enabled).apply()
 
+    fun isHealthConnectCaloriesEnabled(): Boolean = prefs.getBoolean("health_connect_calories_enabled", false)
+    fun setHealthConnectCaloriesEnabled(enabled: Boolean) = prefs.edit().putBoolean("health_connect_calories_enabled", enabled).apply()
+
     fun isOnboardingComplete(): Boolean = prefs.getBoolean("onboarding_complete", false)
     fun setOnboardingComplete(complete: Boolean) = prefs.edit().putBoolean("onboarding_complete", complete).apply()
 

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Radar
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -98,6 +99,7 @@ fun SettingsScreen(
     val healthConnectManager = remember { HealthConnectManager(context) }
     val isHcAvailable = remember { healthConnectManager.isNativeAndroid14Available() }
     var healthConnectEnabled by remember { mutableStateOf(repository.isHealthConnectEnabled()) }
+    var healthConnectCaloriesEnabled by remember { mutableStateOf(repository.isHealthConnectCaloriesEnabled()) }
     var autoBackupEnabled by remember { mutableStateOf(repository.isAutoBackupEnabled()) }
     var autoBackupDirUri by remember { mutableStateOf(repository.getAutoBackupDirectoryUri()) }
     var lastAutoBackupDate by remember { mutableStateOf(repository.getLastAutoBackupDate()) }
@@ -111,6 +113,17 @@ fun SettingsScreen(
         if (hasAll) {
             coroutineScope.launch {
                 healthConnectManager.writeTodaySteps(repository.getTodaySteps())
+            }
+        }
+    }
+
+    val caloriePermissionLauncher = rememberLauncherForActivityResult(permissionContract) { grantedPermissions ->
+        val hasAll = grantedPermissions.containsAll(healthConnectManager.caloriePermissions)
+        healthConnectCaloriesEnabled = hasAll
+        repository.setHealthConnectCaloriesEnabled(hasAll)
+        if (hasAll) {
+            coroutineScope.launch {
+                healthConnectManager.writeTodayCalories(repository.getCalories(repository.getTodaySteps()))
             }
         }
     }
@@ -170,6 +183,7 @@ fun SettingsScreen(
                 weekendGoalText = repository.getGoalWeekend().toString()
                 motionSensitivity = repository.getMotionSensitivity()
                 healthConnectEnabled = repository.isHealthConnectEnabled()
+                healthConnectCaloriesEnabled = repository.isHealthConnectCaloriesEnabled()
                 autoBackupEnabled = repository.isAutoBackupEnabled()
                 autoBackupDirUri = repository.getAutoBackupDirectoryUri()
                 lastAutoBackupDate = repository.getLastAutoBackupDate()
@@ -602,6 +616,54 @@ fun SettingsScreen(
                                     } else {
                                         healthConnectEnabled = false
                                         repository.setHealthConnectEnabled(false)
+                                    }
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = currentAccentColor)
+                            )
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            color = primaryTextColor.copy(alpha = 0.08f)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.label_sync_calories_health_connect),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    color = primaryTextColor
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(R.string.desc_sync_calories_health_connect),
+                                    fontSize = 12.sp,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    color = Color.Gray,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Switch(
+                                checked = healthConnectCaloriesEnabled,
+                                onCheckedChange = { checked ->
+                                    if (checked) {
+                                        coroutineScope.launch {
+                                            if (healthConnectManager.hasCaloriePermissions()) {
+                                                healthConnectCaloriesEnabled = true
+                                                repository.setHealthConnectCaloriesEnabled(true)
+                                                healthConnectManager.writeTodayCalories(repository.getCalories(repository.getTodaySteps()))
+                                            } else {
+                                                caloriePermissionLauncher.launch(healthConnectManager.caloriePermissions)
+                                            }
+                                        }
+                                    } else {
+                                        healthConnectCaloriesEnabled = false
+                                        repository.setHealthConnectCaloriesEnabled(false)
                                     }
                                 },
                                 colors = SwitchDefaults.colors(checkedThumbColor = currentAccentColor)

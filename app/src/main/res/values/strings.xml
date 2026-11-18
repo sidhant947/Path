@@ -83,6 +83,8 @@
     <string name="section_health_connect">HEALTH CONNECT</string>
     <string name="label_sync_health_connect">SYNC TO HEALTH CONNECT</string>
     <string name="desc_sync_health_connect">AOSP Native sync (Android 14+). Requires no Google Play Services.</string>
+    <string name="label_sync_calories_health_connect">SYNC CALORIES</string>
+    <string name="desc_sync_calories_health_connect">Sync burned calories to Health Connect.</string>
     <string name="section_backup_restore">BACKUP &amp; RESTORE</string>
     <string name="label_daily_auto_backup">DAILY AUTO BACKUP</string>
     <string name="desc_daily_auto_backup">Automatically save backup to device storage once per day.</string>
